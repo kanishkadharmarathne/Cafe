@@ -1,0 +1,85 @@
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import './Navbar.css'
+import AuthModal from './AuthModal'
+import { supabase } from '../lib/supabase'
+
+export default function Navbar() {
+  const navigate = useNavigate()
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUserName(session.user.user_metadata?.name || session.user.email || 'User')
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUserName(session.user.user_metadata?.name || session.user.email || 'User')
+      } else {
+        setUserName(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    setUserName(null)
+  }
+
+  return (
+    <>
+      <nav className="navbar">
+        <div className="nav-logo" onClick={() => navigate('/')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}>
+          <div className="logo-circle">
+            <span className="logo-icon">☕</span>
+          </div>
+          <span className="logo-name">Brewed Bliss</span>
+        </div>
+
+        <div className="nav-tabs">
+          <NavLink to="/our-cafe" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Our Cafe
+          </NavLink>
+          <NavLink to="/menu" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Menu
+          </NavLink>
+          <NavLink to="/contact" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Contact
+          </NavLink>
+          <NavLink to="/our-legacy" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            Our Legacy
+          </NavLink>
+        </div>
+
+        <div className="nav-auth">
+          {userName ? (
+            <>
+              <span className="nav-user-name">{userName}</span>
+              <button className="nav-btn-admin" onClick={() => navigate('/admin')}>Admin</button>
+              <button className="nav-btn-signout" onClick={handleSignOut}>Sign Out</button>
+            </>
+          ) : (
+            <>
+              <button className="nav-btn-login" onClick={() => setAuthMode('login')}>Log In</button>
+              <button className="nav-btn-signup" onClick={() => setAuthMode('signup')}>Sign Up</button>
+            </>
+          )}
+        </div>
+      </nav>
+
+      {authMode && (
+        <AuthModal
+          initialMode={authMode}
+          onClose={() => setAuthMode(null)}
+          onSuccess={(name) => setUserName(name)}
+        />
+      )}
+    </>
+  )
+}

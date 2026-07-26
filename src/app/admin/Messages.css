@@ -1,0 +1,165 @@
+.messages-page {
+    width: 100%;
+    color: #f5e6c8;
+}
+
+.messages-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+.messages-header h2 {
+    font-size: 2rem;
+    color: #fff3dd;
+    font-weight: 700;
+}
+
+.messages-count {
+    color: #9b6a39;
+    font-size: 1rem;
+}
+
+.loading,
+.empty {
+    text-align: center;
+    padding: 60px;
+    color: #a37a4c;
+}
+
+.messages-table {
+    border: 1px solid #4a2812;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #1f0c04;
+}
+
+.messages-table-head {
+    display: grid;
+    grid-template-columns:
+        170px
+        220px
+        1fr
+        120px
+        90px
+        140px;
+
+    padding: 18px 20px;
+
+    background: #35180b;
+
+    color: #9b6a39;
+
+    font-size: .85rem;
+
+    text-transform: uppercase;
+
+    letter-spacing: .08em;
+}
+
+.messages-row {
+    display: grid;
+    grid-template-columns:
+        170px
+        220px
+        1fr
+        120px
+        90px
+        140px;
+
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 18px 20px;
+
+    border-top: 1px solid #3b1b0b;
+
+    transition: .2s;
+}
+
+.messages-row:hover {
+    background: #2a1408;
+}
+
+.messages-row.unread {
+    border-left: 4px solid #d2a15d;
+    background: rgba(210,161,93,.08);
+}
+
+.messages-row span {
+    color: #f5e6c8;
+}
+
+.message-text {
+    line-height: 1.6;
+    color: #e8d3b1;
+    word-break: break-word;
+}
+
+.read-btn {
+    background: #31411d;
+    color: #9cf18a;
+
+    border: 1px solid #466126;
+
+    border-radius: 30px;
+
+    padding: 8px 14px;
+
+    cursor: pointer;
+
+    transition: .2s;
+}
+
+.read-btn:hover {
+    background: #3d5225;
+}
+
+.star-btn {
+    background: transparent;
+
+    border: none;
+
+    font-size: 24px;
+
+    cursor: pointer;
+
+    transition: .2s;
+}
+
+.star-btn:hover {
+    transform: scale(1.2);
+}
+
+.star-btn:active {
+    transform: scale(.95);
+}
+
+.message-date {
+    color: #a37a4c;
+    font-size: .9rem;
+}
+
+@media (max-width: 1100px) {
+
+    .messages-table-head {
+        display: none;
+    }
+
+    .messages-row {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+
+        gap: 12px;
+
+        padding: 22px;
+    }
+
+    .messages-row span {
+        width: 100%;
+    }
+
+}
