@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import './CheckoutModal.css'
+import { supabase } from '../lib/supabase';
 
-interface CartEntry { name: string; qty: number; amount: number }
+interface CartEntry { id: string; name: string; qty: number; amount: number }
 
 interface CheckoutModalProps {
   cart: CartEntry[]
   grandTotal: number
   onClose: () => void
   onSuccess: () => void
+}
+
+interface CartEntry {
+  id: string;
+  name: string;
+  qty: number;
+  amount: number;
 }
 
 type Step = 'details' | 'payment' | 'confirm'
@@ -27,7 +35,7 @@ function formatExpiry(val: string) {
 export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: CheckoutModalProps) {
   const [step, setStep] = useState<Step>('details')
 
-  const [details, setDetails] = useState({ name: '', email: '', phone: '', address: '' })
+  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '' })
   const [detailsErrors, setDetailsErrors] = useState<Record<string, string>>({})
 
   const [cardType, setCardType] = useState<CardType>('')
@@ -35,8 +43,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
   const [showCvv, setShowCvv] = useState(false)
   const [payErrors, setPayErrors] = useState<Record<string, string>>({})
   const [processing, setProcessing] = useState(false)
-
-  const orderId = `BB-${Math.floor(100000 + Math.random() * 900000)}`
+  const [orderId, setOrderId] = useState<string>('')
 
   // ── Validation ──
   function validateDetails() {
@@ -46,7 +53,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     else if (!/\S+@\S+\.\S+/.test(details.email)) e.email = 'Enter a valid email'
     if (!details.phone) e.phone = 'Phone number is required'
     else if (!/^\d{10}$/.test(details.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid 10-digit number'
-    if (!details.address.trim()) e.address = 'Delivery address is required'
+    if (!details.order_type.trim()) e.order_type = 'Order type is required'
     return e
   }
 
@@ -71,23 +78,111 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     if (Object.keys(errs).length === 0) setStep('payment')
   }
 
-  function handlePaySubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const errs = validatePayment()
-    setPayErrors(errs)
-    if (Object.keys(errs).length > 0) return
-    setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
-      setStep('confirm')
-    }, 2000)
-  }
-
   const stepLabels: { key: Step; label: string }[] = [
     { key: 'details', label: 'Your Details' },
     { key: 'payment', label: 'Payment' },
     { key: 'confirm', label: 'Confirmation' },
   ]
+
+
+
+  async function orderSave() {
+  console.log("Cart before save:", cart);
+  const invalidItems = cart.filter(item => !item.id);
+  if (invalidItems.length > 0) {
+    console.error("Missing item IDs:", invalidItems);
+    throw new Error("Some cart items do not have item IDs.");
+  }
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert({
+      customer_name: details.name,
+      email: details.email,
+      phone: details.phone,
+      order_type: details.order_type,
+      total_value: grandTotal
+    })
+    .select("order_id")
+    .single();
+
+
+  if (orderError) {
+    console.error("Order save error:", orderError);
+    throw orderError;
+  }
+
+  const orderItems = cart.map((item) => ({
+    order_id: order.order_id,
+    item_id: item.id,          // must exist
+    item_name: item.name,
+    quantity: item.qty
+  }));
+
+  const { error: itemError } = await supabase
+    .from("order_items")
+    .insert(orderItems);
+
+
+  if (itemError) {
+    console.error("Order items save error:", itemError);
+    throw itemError;
+  }
+  setOrderId(order.order_id);
+}
+
+useEffect(() => {
+  fetchOrders();
+}, []);
+
+async function fetchOrders() {
+
+  const {
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    console.error("User not logged in")
+    return
+  }
+  const { data: orders, error } = await supabase
+    .from('orders')
+  .select(`
+    *,
+    order_items(*)
+  `)
+  .eq('user_id', user.id)
+
+
+  if (error) {
+    console.error(error)
+    return
+  }
+  console.log(orders)
+
+}
+async function handlePaySubmit(e: React.FormEvent) {
+  e.preventDefault();
+
+  const errs = validatePayment();
+  setPayErrors(errs);
+
+  if (Object.keys(errs).length > 0) return;
+
+  try {
+    setProcessing(true);
+
+    await orderSave();
+
+    setProcessing(false);
+    setStep("confirm");
+  } catch (err) {
+    console.error(err);
+    setProcessing(false);
+    alert("Failed to save order.");
+  }
+}
+
   const stepIndex = { details: 0, payment: 1, confirm: 2 }
 
   const modal = (
@@ -122,6 +217,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
               <ul className="co-order-list">
                 {cart.map((item) => (
                   <li key={item.name} className="co-order-item">
+                    <span></span>
                     <span>{item.name} <em>×{item.qty}</em></span>
                     <span>₹{item.amount * item.qty}</span>
                   </li>
@@ -161,14 +257,34 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
               </div>
 
               <div className="co-field">
-                <label htmlFor="co-address">Delivery Address</label>
-                <textarea id="co-address" rows={3} placeholder="House no, street, city, pincode"
-                  value={details.address} onChange={(e) => setDetails({ ...details, address: e.target.value })}
-                  className={detailsErrors.address ? 'err' : ''} />
-                {detailsErrors.address && <span className="co-err">{detailsErrors.address}</span>}
+                <label>Order Type</label>
+
+                <div className="order-type-container">
+                  <div
+                    className={`order-type-card ${details.order_type === 'Takeaway' ? 'active' : ''}`}
+                    onClick={() => setDetails({ ...details, order_type: 'Takeaway' })}
+                  >
+                    🍱
+                    <h4>Takeaway</h4>
+                    <p>Pick up your order from the restaurant.</p>
+                  </div>
+
+                  <div
+                    className={`order-type-card ${details.order_type === 'Dine In' ? 'active' : ''}`}
+                    onClick={() => setDetails({ ...details, order_type: 'Dine In' })}
+                  >
+                    🍽️
+                    <h4>Dine In</h4>
+                    <p>Enjoy your meal at the restaurant.</p>
+                  </div>
+                </div>
+
+                {detailsErrors.orderType && (
+                  <span className="co-err">{detailsErrors.orderType}</span>
+                )}
               </div>
 
-              <button type="submit" className="co-submit">Continue to Payment →</button>
+              <button type="submit" className="co-submit" >Continue to Payment →</button>
             </form>
           </div>
         )}
@@ -285,8 +401,8 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
 
               <div className="co-btn-row">
                 <button type="button" className="co-back" onClick={() => setStep('details')}>← Back</button>
-                <button type="submit" className="co-submit" disabled={processing}>
-                  {processing ? <span className="co-spinner" /> : `Pay ₹${grandTotal}`}
+                <button type="submit" className="co-submit" disabled={processing} >
+                  {processing ? <span className="co-spinner" /> : `Pay ₹${grandTotal}`} 
                 </button>
               </div>
             </form>

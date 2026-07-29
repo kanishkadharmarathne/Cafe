@@ -10,6 +10,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Food & Bakes': '🥐',
 }
 
+
 interface MenuItem {
   id: string
   category: string
@@ -19,164 +20,720 @@ interface MenuItem {
   price: number
 }
 
+
+interface CartEntry {
+  id: string
+  name: string
+  qty: number
+  amount: number
+}
+
+
+
 export default function Menu() {
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [menuLoading, setMenuLoading] = useState(true)
-  const [cart, setCart] = useState<Record<string, number>>({})
+
+  const [cart, setCart] = useState<CartEntry[]>([])
+
   const [added, setAdded] = useState<Record<string, boolean>>({})
 
-  useEffect(() => {
-    supabase
-      .from('menu_items')
-      .select('id, category, item, portion, description, price')
-      .eq('status', true)
-      .order('category')
-      .order('item')
-      .then(({ data }) => {
-        if (data) setMenuItems(data)
-        setMenuLoading(false)
-      })
-  }, [])
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [orders, setOrders] = useState<any[]>([]);
+const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const priceMap: Record<string, number> = Object.fromEntries(
-    menuItems.map((i) => [i.item, i.price])
+  async function fetchOrders() {
+
+  setLoadingOrders(true);
+
+  const {
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser();
+
+
+  if (authError || !user) {
+    console.error("User not logged in");
+    setLoadingOrders(false);
+    return;
+  }
+
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items(*)
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+
+  if (error) {
+    console.error(error);
+    setLoadingOrders(false);
+    return;
+  }
+
+
+  setOrders(data || []);
+  setLoadingOrders(false);
+}
+
+  useEffect(() => {
+    fetchOrders();
+
+    async function fetchMenu(){
+
+      const {data,error} = await supabase
+        .from('menu_items')
+        .select('id, category, item, portion, description, price')
+        .eq('status',true)
+        .order('category')
+        .order('item')
+
+
+      if(!error && data){
+        setMenuItems(data)
+      }
+
+      setMenuLoading(false)
+
+    }
+
+
+    fetchMenu()
+
+  },[])
+
+
+
+  const categories = Array.from(
+    new Set(menuItems.map(item=>item.category))
   )
 
-  const categories = Array.from(new Set(menuItems.map((i) => i.category)))
+  function handleAddToCart(menuItem:MenuItem){
 
-  function handleAddToCart(name: string) {
-    setCart((prev) => ({ ...prev, [name]: (prev[name] ?? 0) + 1 }))
-    setAdded((prev) => ({ ...prev, [name]: true }))
-    setTimeout(() => setAdded((prev) => ({ ...prev, [name]: false })), 1200)
-  }
 
-  function increment(name: string) {
-    setCart((prev) => ({ ...prev, [name]: prev[name] + 1 }))
-  }
+    setCart((prev)=>{
 
-  function decrement(name: string) {
-    setCart((prev) => {
-      const qty = prev[name] - 1
-      if (qty <= 0) {
-        const next = { ...prev }
-        delete next[name]
-        return next
+      const existing = prev.find(
+        item=>item.id === menuItem.id
+      )
+
+
+      if(existing){
+
+        return prev.map(item=>
+
+          item.id === menuItem.id
+
+          ? {
+              ...item,
+              qty:item.qty+1
+            }
+
+          : item
+
+        )
+
       }
-      return { ...prev, [name]: qty }
+
+
+
+      return [
+
+        ...prev,
+
+        {
+          id:menuItem.id,
+          name:menuItem.item,
+          qty:1,
+          amount:menuItem.price
+        }
+
+      ]
+
+
     })
+
+
+    setAdded(prev=>({
+      ...prev,
+      [menuItem.id]:true
+    }))
+
+
+    setTimeout(()=>{
+
+      setAdded(prev=>({
+        ...prev,
+        [menuItem.id]:false
+      }))
+
+    },1200)
+
+
   }
 
-  function removeItem(name: string) {
-    setCart((prev) => {
-      const next = { ...prev }
-      delete next[name]
-      return next
-    })
+
+
+
+
+  function increment(id:string){
+
+    setCart(prev=>
+
+      prev.map(item=>
+
+        item.id === id
+
+        ? {
+            ...item,
+            qty:item.qty+1
+          }
+
+        : item
+
+      )
+
+    )
+
   }
 
-  const cartEntries = Object.entries(cart)
-  const totalItems = cartEntries.reduce((a, [, qty]) => a + qty, 0)
-  const grandTotal = cartEntries.reduce((a, [name, qty]) => a + (priceMap[name] ?? 0) * qty, 0)
-  const [showCheckout, setShowCheckout] = useState(false)
 
-  const cartForModal = cartEntries.map(([name, qty]) => ({ name, qty, amount: priceMap[name] ?? 0 }))
+
+
+  function decrement(id:string){
+
+    setCart(prev=>
+
+      prev
+      .map(item=>
+
+        item.id === id
+
+        ? {
+            ...item,
+            qty:item.qty-1
+          }
+
+        : item
+
+      )
+      .filter(item=>item.qty>0)
+
+    )
+
+  }
+
+
+
+
+
+  function removeItem(id:string){
+
+    setCart(prev=>
+
+      prev.filter(item=>item.id!==id)
+
+    )
+
+  }
+
+
+
+
+
+  const totalItems = cart.reduce(
+    (sum,item)=>sum+item.qty,
+    0
+  )
+
+
+  const grandTotal = cart.reduce(
+    (sum,item)=>
+      sum+(item.amount*item.qty),
+    0
+  )
+
+  
+
+
 
   return (
+
     <>
+
     <main className="page inner-page">
+
+
       <div className="page-header">
-        <span className="page-eyebrow">What We Serve</span>
-        <h1>Menu</h1>
-        <div className="divider" />
-        <p className="page-desc">Seasonal, honest, and made with care.</p>
+
+        <span className="page-eyebrow">
+          What We Serve
+        </span>
+
+        <h1>
+          Menu
+        </h1>
+
+        <div className="divider"/>
+
+        <p className="page-desc">
+          Seasonal, honest, and made with care.
+        </p>
+
       </div>
 
-      {/* ── Cart panel ── */}
-      {cartEntries.length > 0 && (
+
+
+      <button className="admin-btn-primary-orders">
+        Order History
+      </button>
+
+      <div className="order-history">
+
+  <h2>My Orders</h2>
+
+
+  {loadingOrders ? (
+    <p>Loading orders...</p>
+  ) : orders.length === 0 ? (
+    <p>No orders found.</p>
+  ) : (
+
+    orders.map((order) => (
+
+      <div className="order-card" key={order.order_id}>
+
+        <div className="order-header">
+          <h3>
+            Order #{order.order_id}
+          </h3>
+
+          <span>
+            {new Date(order.created_at).toLocaleDateString()}
+          </span>
+        </div>
+
+
+        <p>
+          Type: {order.order_type}
+        </p>
+
+        <p>
+          Total: ₹{order.total_value}
+        </p>
+
+
+        <h4>Items</h4>
+
+        <ul>
+          {order.order_items.map((item:any) => (
+
+            <li key={item.id}>
+              {item.item_name} × {item.quantity}
+              - ₹{item.amount * item.quantity}
+            </li>
+
+          ))}
+        </ul>
+
+
+      </div>
+
+    ))
+
+  )}
+
+</div>
+
+
+
+      {
+        cart.length > 0 &&
+
         <div className="cart-panel">
+
+
           <div className="cart-panel-header">
+
             <span className="cart-panel-title">
+
               🛒 Your Order
-              <span className="cart-total-badge">{totalItems} item{totalItems > 1 ? 's' : ''}</span>
+
+              <span className="cart-total-badge">
+
+                {totalItems} item
+                {totalItems>1?'s':''}
+
+              </span>
+
             </span>
-            <button className="cart-clear-btn" onClick={() => setCart({})}>Clear all</button>
+
+
+
+            <button
+
+              className="cart-clear-btn"
+
+              onClick={()=>setCart([])}
+
+            >
+
+              Clear all
+
+            </button>
+
+
           </div>
+
+
+
+
+
 
           <ul className="cart-list">
-            {cartEntries.map(([name, qty]) => (
-              <li className="cart-list-item" key={name}>
-                <div className="cart-item-name">
-                  <span>{name}</span>
-                  <span className="cart-item-unit-price">₹{priceMap[name]} each</span>
-                </div>
-                <div className="cart-item-controls">
-                  <button className="cart-qty-btn" onClick={() => decrement(name)} aria-label="Decrease">−</button>
-                  <span className="cart-qty">{qty}</span>
-                  <button className="cart-qty-btn" onClick={() => increment(name)} aria-label="Increase">+</button>
-                </div>
-                <span className="cart-item-subtotal">₹{priceMap[name] * qty}</span>
-                <button className="cart-remove-btn" onClick={() => removeItem(name)} aria-label="Remove">✕</button>
-              </li>
-            ))}
+
+
+            {
+              cart.map(item=>(
+
+
+                <li
+
+                  className="cart-list-item"
+
+                  key={item.id}
+
+                >
+
+
+                  <div className="cart-item-name">
+
+                    <span>
+                      {item.name}
+                    </span>
+
+
+                    <span className="cart-item-unit-price">
+
+                      ₹{item.amount} each
+
+                    </span>
+
+
+                  </div>
+
+
+
+
+                  <div className="cart-item-controls">
+
+
+                    <button onClick={() => decrement(item.id)}>
+                      -
+                    </button>
+
+
+
+                    <span className="cart-qty">
+
+                      {item.qty}
+
+                    </span>
+
+
+
+
+                    <button onClick={() => increment(item.id)}>
+                      +
+                    </button>
+
+
+                  </div>
+
+
+
+
+                  <span className="cart-item-subtotal">
+
+                    ₹{item.amount * item.qty}
+
+                  </span>
+
+
+
+
+                 <button onClick={() => removeItem(item.id)}>
+                    ✕
+                  </button>
+
+
+
+                </li>
+
+
+              ))
+            }
+
+
           </ul>
 
-          <div className="cart-panel-footer">
-            <div className="cart-grand-total">
-              <span>Total</span>
-              <span className="cart-total-amount">₹{grandTotal}</span>
-            </div>
-            <button className="btn-checkout-full" onClick={() => setShowCheckout(true)}>Proceed to Checkout →</button>
-          </div>
-        </div>
-      )}
 
-      {menuLoading ? (
-        <p style={{ textAlign: 'center', color: '#7a5c3e', padding: '60px 0' }}>Loading menu…</p>
-      ) : (
-        categories.map((category) => {
-          const items = menuItems.filter((i) => i.category === category)
+
+
+
+          <div className="cart-panel-footer">
+
+
+            <div className="cart-grand-total">
+
+              <span>
+                Total
+              </span>
+
+
+              <span className="cart-total-amount">
+
+                ₹{grandTotal}
+
+              </span>
+
+
+            </div>
+
+
+
+
+            <button onClick={() => setShowCheckout(true)}>
+              Proceed to Checkout →
+            </button>
+
+
+
+          </div>
+
+
+        </div>
+
+      }
+
+
+
+
+
+
+      {
+        menuLoading
+
+        ?
+
+        <p style={{
+          textAlign:'center',
+          color:'#7a5c3e',
+          padding:'60px 0'
+        }}>
+
+          Loading menu...
+
+        </p>
+
+
+        :
+
+        categories.map(category=>{
+
+
+          const items =
+            menuItems.filter(
+              item=>item.category===category
+            )
+
+
+
           return (
-            <section className="menu-section" key={category}>
+
+            <section
+
+              className="menu-section"
+
+              key={category}
+
+            >
+
+
               <h2 className="menu-category">
-                <span>{CATEGORY_ICONS[category] ?? '☕'}</span> {category}
+
+                <span>
+                  {CATEGORY_ICONS[category] ?? '☕'}
+                </span>
+
+                {category}
+
               </h2>
+
+
+
+
               <div className="menu-grid">
-                {items.map((menuItem) => (
-                  <div className="menu-item" key={menuItem.id}>
-                    <div className="menu-item-info">
-                      <h3>{menuItem.item}</h3>
-                      {menuItem.portion && <span className="menu-item-portion">{menuItem.portion}</span>}
-                      <p>{menuItem.description}</p>
-                    </div>
-                    <div className="menu-item-right">
-                      <span className="menu-price">₹{menuItem.price}</span>
-                      <div className="menu-item-actions">
-                        <button
-                          className={`menu-btn-cart ${added[menuItem.item] ? 'added' : ''}`}
-                          onClick={() => handleAddToCart(menuItem.item)}
-                        >
-                          {added[menuItem.item] ? '✓ Added' : '+ Cart'}
-                        </button>
-                        <button className="menu-btn-buy">Buy Now</button>
+
+
+                {
+                  items.map(menuItem=>(
+
+
+                    <div
+
+                      className="menu-item"
+
+                      key={menuItem.id}
+
+                    >
+
+
+
+                      <div className="menu-item-info">
+
+
+                        <h3>
+                          {menuItem.item}
+                        </h3>
+
+
+
+                        {
+                          menuItem.portion &&
+
+                          <span className="menu-item-portion">
+
+                            {menuItem.portion}
+
+                          </span>
+
+                        }
+
+
+
+
+                        <p>
+
+                          {menuItem.description}
+
+                        </p>
+
+
                       </div>
+
+
+
+
+
+                      <div className="menu-item-right">
+
+
+                        <span className="menu-price">
+
+                          ₹{menuItem.price}
+
+                        </span>
+
+
+
+
+                        <div className="menu-item-actions">
+
+
+                          <button
+                            className={`menu-btn-cart ${added[menuItem.id] ? 'added' : ''}`}
+                            onClick={() => handleAddToCart(menuItem)}
+                          >
+                            {added[menuItem.id] ? '✓ Added' : '+ Cart'}
+                          </button>
+
+
+
+
+                          <button className="menu-btn-buy">
+
+                            Buy Now
+
+                          </button>
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
                     </div>
-                  </div>
-                ))}
+
+
+                  ))
+                }
+
+
               </div>
+
+
+
             </section>
+
+
           )
+
+
         })
-      )}
+
+
+      }
+
+
+
+
     </main>
 
-      {showCheckout && (
-        <CheckoutModal
-          cart={cartForModal}
-          grandTotal={grandTotal}
-          onClose={() => setShowCheckout(false)}
-          onSuccess={() => setCart({})}
-        />
-      )}
+
+
+
+
+    {
+      showCheckout &&
+
+
+      <CheckoutModal
+
+
+        cart={cart}
+
+
+        grandTotal={grandTotal}
+
+
+        onClose={()=>
+          setShowCheckout(false)
+        }
+
+
+        onSuccess={()=>
+          setCart([])
+        }
+
+
+      />
+
+    }
+
+
+
     </>
+
   )
+
 }

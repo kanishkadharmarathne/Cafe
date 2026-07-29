@@ -13,6 +13,44 @@
   overflow-y: auto;
 }
 
+.order-type-container {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.order-type-card {
+  flex: 1;
+  padding: 20px;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: #fff;
+}
+
+.order-type-card:hover {
+  border-color: #ff9800;
+  transform: translateY(-3px);
+}
+
+.order-type-card.active {
+  border-color: #ff9800;
+  background: #fff3e0;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+}
+
+.order-type-card h4 {
+  margin: 10px 0 6px;
+}
+
+.order-type-card p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
 @keyframes coFade {
   from { opacity: 0; }
   to   { opacity: 1; }
