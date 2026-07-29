@@ -281,7 +281,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
         <div className="divider"/>
 
-        <p className="page-desc">
+        <p className="page-desc">`
           Seasonal, honest, and made with care.
         </p>
 
@@ -291,7 +291,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
       <button className="admin-btn-primary-orders">
         Order History
-      </button>
+      </button>`
 
       <div className="order-history">
 
