@@ -45,6 +45,31 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
   const [processing, setProcessing] = useState(false)
   const [orderId, setOrderId] = useState<string>('')
 
+  useEffect(() => {
+    async function prefillFromSession() {
+      const {
+        data: { user },
+        error
+      } = await supabase.auth.getUser()
+
+      if (error || !user) return
+
+      const fullName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.display_name ||
+        ''
+
+      setDetails((prev) => ({
+        ...prev,
+        name: prev.name || fullName,
+        email: prev.email || user.email || ''
+      }))
+    }
+
+    prefillFromSession()
+  }, [])
+
   // ── Validation ──
   function validateDetails() {
     const e: Record<string, string> = {}
@@ -87,20 +112,32 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
 
 
   async function orderSave() {
-  console.log("Cart before save:", cart);
   const invalidItems = cart.filter(item => !item.id);
   if (invalidItems.length > 0) {
     console.error("Missing item IDs:", invalidItems);
     throw new Error("Some cart items do not have item IDs.");
   }
+
+  const {
+    data: { user },
+    error: authError
+  } = await supabase.auth.getUser()
+
+  if (authError) {
+    console.error("Failed to get current user:", authError)
+    throw authError
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
+      user_id: user?.id ?? null,
       customer_name: details.name,
       email: details.email,
       phone: details.phone,
       order_type: details.order_type,
-      total_value: grandTotal
+      total_value: grandTotal,
+      payment_status: true
     })
     .select("order_id")
     .single();
@@ -128,38 +165,6 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     throw itemError;
   }
   setOrderId(order.order_id);
-}
-
-useEffect(() => {
-  fetchOrders();
-}, []);
-
-async function fetchOrders() {
-
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    console.error("User not logged in")
-    return
-  }
-  const { data: orders, error } = await supabase
-    .from('orders')
-  .select(`
-    *,
-    order_items(*)
-  `)
-  .eq('user_id', user.id)
-
-
-  if (error) {
-    console.error(error)
-    return
-  }
-  console.log(orders)
-
 }
 async function handlePaySubmit(e: React.FormEvent) {
   e.preventDefault();
@@ -233,7 +238,7 @@ async function handlePaySubmit(e: React.FormEvent) {
 
               <div className="co-row">
                 <div className="co-field">
-                  <label htmlFor="co-name">Full Name</label>
+                  <label htmlFor="co-name">Name</label>
                   <input id="co-name" type="text" placeholder="Your full name" autoComplete="name"
                     value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })}
                     className={detailsErrors.name ? 'err' : ''} />
@@ -264,7 +269,7 @@ async function handlePaySubmit(e: React.FormEvent) {
                     className={`order-type-card ${details.order_type === 'Takeaway' ? 'active' : ''}`}
                     onClick={() => setDetails({ ...details, order_type: 'Takeaway' })}
                   >
-                    🍱
+                    <span className="order-type-icon">🍱</span>
                     <h4>Takeaway</h4>
                     <p>Pick up your order from the restaurant.</p>
                   </div>
@@ -273,14 +278,14 @@ async function handlePaySubmit(e: React.FormEvent) {
                     className={`order-type-card ${details.order_type === 'Dine In' ? 'active' : ''}`}
                     onClick={() => setDetails({ ...details, order_type: 'Dine In' })}
                   >
-                    🍽️
+                    <span className="order-type-icon">🍽️</span>
                     <h4>Dine In</h4>
                     <p>Enjoy your meal at the restaurant.</p>
                   </div>
                 </div>
 
-                {detailsErrors.orderType && (
-                  <span className="co-err">{detailsErrors.orderType}</span>
+                {detailsErrors.order_type && (
+                  <span className="co-err">{detailsErrors.order_type}</span>
                 )}
               </div>
 

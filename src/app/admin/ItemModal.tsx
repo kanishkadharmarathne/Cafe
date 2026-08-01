@@ -1,23 +1,13 @@
 import { useEffect, useState } from 'react'
 import './AdminPanel.css'
 
-const CATEGORIES = [
-  'Espresso & Coffee',
-  'Specialty Drinks',
-  'Food & Bakes',
-]
-
-const EMPTY_FORM = {
-  category: CATEGORIES[0],
-  item: '',
-  portion: '',
-  description: '',
-  price: '',
-  status: true,
+interface CategoryOption {
+  id: string
+  category_name: string
 }
 
 interface MenuForm {
-  category: string
+  category_id: string
   item: string
   portion: string
   description: string
@@ -30,6 +20,7 @@ interface ItemModalProps {
   onClose: () => void
   onSave: (data: any) => Promise<void> | void
   initialData?: any
+  categories: CategoryOption[]
 }
 
 export default function ItemModal({
@@ -37,8 +28,16 @@ export default function ItemModal({
   onClose,
   onSave,
   initialData,
+  categories,
 }: ItemModalProps) {
-  const [form, setForm] = useState<MenuForm>(EMPTY_FORM)
+  const [form, setForm] = useState<MenuForm>({
+    category_id: '',
+    item: '',
+    portion: '',
+    description: '',
+    price: '',
+    status: true,
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -46,7 +45,7 @@ export default function ItemModal({
     if (isOpen) {
       if (initialData) {
         setForm({
-          category: initialData.category,
+          category_id: initialData.category_id || '',
           item: initialData.item,
           portion: initialData.portion || '',
           description: initialData.description || '',
@@ -54,12 +53,19 @@ export default function ItemModal({
           status: initialData.status,
         })
       } else {
-        setForm(EMPTY_FORM)
+        setForm({
+          category_id: categories[0]?.id || '',
+          item: '',
+          portion: '',
+          description: '',
+          price: '',
+          status: true,
+        })
       }
 
       setError('')
     }
-  }, [initialData, isOpen])
+  }, [categories, initialData, isOpen])
 
   if (!isOpen) return null
 
@@ -74,12 +80,17 @@ export default function ItemModal({
       return
     }
 
+    if (!form.category_id) {
+      setError('Please select a category')
+      return
+    }
+
     setSaving(true)
     setError('')
 
     try {
       await onSave({
-        category: form.category,
+        category_id: form.category_id,
         item: form.item.trim(),
         portion: form.portion.trim(),
         description: form.description.trim(),
@@ -142,17 +153,17 @@ export default function ItemModal({
           <div className="admin-form-group">
             <label>Category</label>
             <select
-              value={form.category}
+              value={form.category_id}
               onChange={(e) =>
-                setForm({ ...form, category: e.target.value })
+                setForm({ ...form, category_id: e.target.value })
               }
             >
-              {CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <option
-                  key={category}
-                  value={category}
+                  key={category.id}
+                  value={category.id}
                 >
-                  {category}
+                  {category.category_name}
                 </option>
               ))}
             </select>

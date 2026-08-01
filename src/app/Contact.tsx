@@ -276,24 +276,40 @@ export default function Contact() {
 
       <section className="feedback-section">
 
-        <h4>Customer Feedback</h4>
+        <div className="feedback-header">
+          <span className="page-eyebrow">
+            Kind Words
+          </span>
+
+          <h4>Customer Feedback</h4>
+
+          <p className="feedback-intro">
+            Notes from guests who enjoyed the coffee, food, and atmosphere.
+          </p>
+        </div>
 
         <div className="feedback-container">
 
-          {
+          {feedback.length === 0 ? (
+            <div className="feedback-empty">
+              No featured feedback yet.
+            </div>
+          ) : (
             feedback.map(item => (
               <div 
                 key={item.id} 
                 className="feedback-card"
               >
+                <span className="feedback-quote-mark">“</span>
+
                 <h5>{item.name}</h5>
 
                 <p>
-                  "{item.message}"
+                  {item.message}
                 </p>
               </div>
             ))
-          }
+          )}
 
         </div>
 

@@ -4,11 +4,13 @@ import { supabase } from '../../lib/supabase'
 import MenuItems from './MenuItems'
 import './AdminPanel.css'
 import Messages from './Messages'
+import Orders from './Orders'
 
-type Tab = 'menu-items' | 'messages'
+type Tab = 'menu-items' | 'messages' | 'orders'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'menu-items', label: 'Menu Items', icon: '🍽️' },
+  { id: 'orders', label: 'Orders', icon: '🧾' },
   { id: 'messages', label: 'Messages', icon: '✉️' },
 ]
 
@@ -69,6 +71,7 @@ export default function AdminPanel() {
       {/* ── Main content ── */}
       <main className="admin-main">
         {activeTab === 'menu-items' && <MenuItems />}
+        {activeTab === 'orders' && <Orders />}
         {activeTab === 'messages' && <Messages />}
       </main>
     </div>

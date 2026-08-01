@@ -13,11 +13,18 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 interface MenuItem {
   id: string
-  category: string
+  category_id: string | null
   item: string
   portion: string
   description: string
   price: number
+  categories: {
+    id: string
+    category_name: string
+  } | {
+    id: string
+    category_name: string
+  }[] | null
 }
 
 
@@ -26,6 +33,46 @@ interface CartEntry {
   name: string
   qty: number
   amount: number
+}
+
+interface OrderItem {
+  id: number
+  item_name: string
+  quantity: number
+  amount?: number | null
+}
+
+interface Order {
+  order_id: number
+  order_type: 'Takeaway' | 'Dine In'
+  total_value: number | string
+  order_time: string
+  payment_status: boolean
+  processing_status: boolean
+  is_ready: boolean
+  delivery_status: boolean
+  order_items: OrderItem[] | null
+}
+
+function getPaymentStatus(order: Order) {
+  return order.payment_status ? 'Paid' : 'Pending'
+}
+
+function getProcessingStatus(order: Order) {
+  if (order.is_ready) return 'Completed'
+  if (order.processing_status) return 'Preparing'
+  return 'Pending'
+}
+
+function getDeliveryStatus(order: Order) {
+  return order.delivery_status ? 'Delivered' : 'Pending'
+}
+
+function getCategoryRef(item: MenuItem) {
+  if (!item.categories) return null
+  return Array.isArray(item.categories)
+    ? item.categories[0] || null
+    : item.categories
 }
 
 
@@ -40,62 +87,71 @@ export default function Menu() {
   const [added, setAdded] = useState<Record<string, boolean>>({})
 
   const [showCheckout, setShowCheckout] = useState(false)
-  const [orders, setOrders] = useState<any[]>([]);
-const [loadingOrders, setLoadingOrders] = useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
 
   async function fetchOrders() {
 
-  setLoadingOrders(true);
+    setLoadingOrders(true)
 
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser()
 
 
-  if (authError || !user) {
-    console.error("User not logged in");
-    setLoadingOrders(false);
-    return;
+    if (authError || !user) {
+      console.error('User not logged in')
+      setOrders([])
+      setLoadingOrders(false)
+      return
+    }
+
+
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items(*)
+      `)
+      .eq('user_id', user.id)
+      .order('order_time', { ascending: false })
+
+
+    if (error) {
+      console.error(error)
+      setLoadingOrders(false)
+      return
+    }
+
+
+    setOrders(data || [])
+    setLoadingOrders(false)
   }
-
-
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items(*)
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-
-
-  if (error) {
-    console.error(error);
-    setLoadingOrders(false);
-    return;
-  }
-
-
-  setOrders(data || []);
-  setLoadingOrders(false);
-}
 
   useEffect(() => {
     fetchOrders();
 
     async function fetchMenu(){
 
-      const {data,error} = await supabase
+      const { data, error } = await supabase
         .from('menu_items')
-        .select('id, category, item, portion, description, price')
-        .eq('status',true)
-        .order('category')
+        .select(`
+          *,
+          categories (
+            id,
+            category_name
+          )
+        `)
+        .eq('status', true)
         .order('item')
 
 
-      if(!error && data){
+      if (!error && data) {
         setMenuItems(data)
+      } else if (error) {
+        console.error('Failed to fetch menu items:', error)
       }
 
       setMenuLoading(false)
@@ -109,8 +165,24 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
 
 
-  const categories = Array.from(
-    new Set(menuItems.map(item=>item.category))
+  const groupedMenu = Array.from(
+    menuItems.reduce((groups, item) => {
+      const relatedCategory = getCategoryRef(item)
+      const categoryName = relatedCategory?.category_name || 'Uncategorized'
+      const categoryKey = relatedCategory?.id || item.category_id || 'uncategorized'
+
+      if (!groups.has(categoryKey)) {
+        groups.set(categoryKey, {
+          key: categoryKey,
+          name: categoryName,
+          icon: CATEGORY_ICONS[categoryName] || '☕',
+          items: [] as MenuItem[],
+        })
+      }
+
+      groups.get(categoryKey)?.items.push(item)
+      return groups
+    }, new Map<string, { key: string; name: string; icon: string; items: MenuItem[] }>() ).values()
   )
 
   function handleAddToCart(menuItem:MenuItem){
@@ -258,6 +330,8 @@ const [loadingOrders, setLoadingOrders] = useState(false);
     0
   )
 
+  const activeOrders = orders.filter(order => !order.delivery_status)
+
   
 
 
@@ -281,30 +355,30 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
         <div className="divider"/>
 
-        <p className="page-desc">`
+        <p className="page-desc">
           Seasonal, honest, and made with care.
         </p>
 
       </div>
 
-
-
-      <button className="admin-btn-primary-orders">
-        Order History
-      </button>`
-
       <div className="order-history">
 
-  <h2>My Orders</h2>
+  <div className="order-history-header">
+    <h2>My Orders</h2>
+
+    <button className="admin-btn-primary-orders" onClick={() => setShowOrderHistory(true)}>
+      Order History
+    </button>
+  </div>
 
 
   {loadingOrders ? (
     <p>Loading orders...</p>
-  ) : orders.length === 0 ? (
-    <p>No orders found.</p>
+  ) : activeOrders.length === 0 ? (
+    <p>No active orders found.</p>
   ) : (
 
-    orders.map((order) => (
+    activeOrders.map((order) => (
 
       <div className="order-card" key={order.order_id}>
 
@@ -314,7 +388,21 @@ const [loadingOrders, setLoadingOrders] = useState(false);
           </h3>
 
           <span>
-            {new Date(order.created_at).toLocaleDateString()}
+            {new Date(order.order_time).toLocaleDateString()}
+          </span>
+        </div>
+
+        <div className="order-status-row">
+          <span className={`order-status-badge ${order.payment_status ? 'is-paid' : 'is-pending'}`}>
+            Payment: {getPaymentStatus(order)}
+          </span>
+
+          <span className={`order-status-badge ${order.is_ready ? 'is-ready' : order.processing_status ? 'is-progress' : 'is-pending'}`}>
+            Kitchen: {getProcessingStatus(order)}
+          </span>
+
+          <span className={`order-status-badge ${order.delivery_status ? 'is-ready' : 'is-pending'}`}>
+            Delivery: {getDeliveryStatus(order)}
           </span>
         </div>
 
@@ -331,11 +419,11 @@ const [loadingOrders, setLoadingOrders] = useState(false);
         <h4>Items</h4>
 
         <ul>
-          {order.order_items.map((item:any) => (
+          {(order.order_items ?? []).map((item) => (
 
             <li key={item.id}>
               {item.item_name} × {item.quantity}
-              - ₹{item.amount * item.quantity}
+              {item.amount != null ? ` - ₹${item.amount * item.quantity}` : ''}
             </li>
 
           ))}
@@ -347,6 +435,118 @@ const [loadingOrders, setLoadingOrders] = useState(false);
     ))
 
   )}
+
+
+
+        {
+          showOrderHistory &&
+
+          <div
+            className="order-history-modal-overlay"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setShowOrderHistory(false)
+              }
+            }}
+          >
+
+            <div className="order-history-modal" role="dialog" aria-modal="true" aria-label="Order history">
+
+              <div className="order-history-modal-header">
+                <div>
+                  <span className="page-eyebrow">
+                    Your Order
+                  </span>
+
+                  <h2>
+                    Order History
+                  </h2>
+                </div>
+
+                <button
+                  className="order-history-close"
+                  onClick={() => setShowOrderHistory(false)}
+                  aria-label="Close order history"
+                >
+                  ✕
+                </button>
+              </div>
+
+
+              <div className="order-history-modal-body">
+
+                {loadingOrders ? (
+                  <p>Loading orders...</p>
+                ) : orders.length === 0 ? (
+                  <p>No orders found.</p>
+                ) : (
+
+                  orders.map((order) => (
+
+                    <div className="order-card order-card-history" key={`history-${order.order_id}`}>
+
+                      <div className="order-header">
+                        <h3>
+                          Order #{order.order_id}
+                        </h3>
+
+                        <span>
+                          {new Date(order.order_time).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="order-status-row">
+                        <span className={`order-status-badge ${order.payment_status ? 'is-paid' : 'is-pending'}`}>
+                          Payment: {getPaymentStatus(order)}
+                        </span>
+
+                        <span className={`order-status-badge ${order.is_ready ? 'is-ready' : order.processing_status ? 'is-progress' : 'is-pending'}`}>
+                          Kitchen: {getProcessingStatus(order)}
+                        </span>
+
+                        <span className={`order-status-badge ${order.delivery_status ? 'is-ready' : 'is-pending'}`}>
+                          Delivery: {getDeliveryStatus(order)}
+                        </span>
+                      </div>
+
+
+                      <p>
+                        Type: {order.order_type}
+                      </p>
+
+                      <p>
+                        Total: ₹{order.total_value}
+                      </p>
+
+
+                      <h4>Items</h4>
+
+                      <ul>
+                        {(order.order_items ?? []).map((item) => (
+
+                          <li key={item.id}>
+                            {item.item_name} × {item.quantity}
+                            {item.amount != null ? ` - ₹${item.amount * item.quantity}` : ''}
+                          </li>
+
+                        ))}
+                      </ul>
+
+
+                    </div>
+
+                  ))
+
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        }
+
 
 </div>
 
@@ -433,7 +633,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
                   <div className="cart-item-controls">
 
 
-                    <button onClick={() => decrement(item.id)}>
+                    <button className="cart-qty-btn" onClick={() => decrement(item.id)}>
                       -
                     </button>
 
@@ -448,7 +648,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
 
 
-                    <button onClick={() => increment(item.id)}>
+                    <button className="cart-qty-btn" onClick={() => increment(item.id)}>
                       +
                     </button>
 
@@ -467,7 +667,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
 
 
-                 <button onClick={() => removeItem(item.id)}>
+                 <button className="cart-remove-btn" onClick={() => removeItem(item.id)}>
                     ✕
                   </button>
 
@@ -508,7 +708,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
 
 
-            <button onClick={() => setShowCheckout(true)}>
+            <button className="btn-checkout-full" onClick={() => setShowCheckout(true)}>
               Proceed to Checkout →
             </button>
 
@@ -544,13 +744,10 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
         :
 
-        categories.map(category=>{
+        groupedMenu.map((group) => {
 
 
-          const items =
-            menuItems.filter(
-              item=>item.category===category
-            )
+          const items = group.items
 
 
 
@@ -560,7 +757,7 @@ const [loadingOrders, setLoadingOrders] = useState(false);
 
               className="menu-section"
 
-              key={category}
+              key={group.key}
 
             >
 
@@ -568,10 +765,10 @@ const [loadingOrders, setLoadingOrders] = useState(false);
               <h2 className="menu-category">
 
                 <span>
-                  {CATEGORY_ICONS[category] ?? '☕'}
+                  {group.icon}
                 </span>
 
-                {category}
+                {group.name}
 
               </h2>
 
@@ -721,9 +918,10 @@ const [loadingOrders, setLoadingOrders] = useState(false);
         }
 
 
-        onSuccess={()=>
+        onSuccess={() => {
           setCart([])
-        }
+          fetchOrders()
+        }}
 
 
       />
