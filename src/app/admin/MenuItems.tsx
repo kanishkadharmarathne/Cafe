@@ -225,19 +225,21 @@ export default function MenuItems() {
         </span>
       </div>
 
-      <button
-        className="admin-btn-primary-catogory"
-        onClick={openCategoryModal}
-      >
-        Create Category
-      </button>
+      <div className="admin-top-actions">
+        <button
+          className="admin-btn-primary-catogory"
+          onClick={openCategoryModal}
+        >
+          Create Category
+        </button>
 
-      <button
-        className="admin-btn-primary"
-        onClick={handleAdd}
-      >
-        + Add Item
-      </button>
+        <button
+          className="admin-btn-primary"
+          onClick={handleAdd}
+        >
+          + Add Item
+        </button>
+      </div>
 
       <ItemModal
         isOpen={isModalOpen}

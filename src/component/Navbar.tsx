@@ -8,28 +8,49 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let isMounted = true
+
+    const syncUserSession = async (session: any) => {
       if (session?.user) {
-        setUserName(session.user.user_metadata?.name || session.user.email || 'User')
+        const displayName = session.user.user_metadata?.name || session.user.email || 'User'
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (!isMounted) return
+
+        setUserName(displayName)
+        setIsSuperAdmin(profile?.role === 'super_admin')
+      } else {
+        if (!isMounted) return
+        setUserName(null)
+        setIsSuperAdmin(false)
       }
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      void syncUserSession(session)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUserName(session.user.user_metadata?.name || session.user.email || 'User')
-      } else {
-        setUserName(null)
-      }
+      void syncUserSession(session)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     setUserName(null)
+    setIsSuperAdmin(false)
   }
 
   return (
@@ -61,7 +82,9 @@ export default function Navbar() {
           {userName ? (
             <>
               <span className="nav-user-name">{userName}</span>
-              <button className="nav-btn-admin" onClick={() => navigate('/admin')}>Admin</button>
+              {isSuperAdmin && (
+                <button className="nav-btn-admin" onClick={() => navigate('/admin')}>Admin</button>
+              )}
               <button className="nav-btn-signout" onClick={handleSignOut}>Sign Out</button>
             </>
           ) : (

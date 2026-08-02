@@ -5,10 +5,12 @@ import MenuItems from './MenuItems'
 import './AdminPanel.css'
 import Messages from './Messages'
 import Orders from './Orders'
+import Admins from './admins'
 
-type Tab = 'menu-items' | 'messages' | 'orders'
+type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'create-admin', label: 'Create Admin', icon: '➕' },
   { id: 'menu-items', label: 'Menu Items', icon: '🍽️' },
   { id: 'orders', label: 'Orders', icon: '🧾' },
   { id: 'messages', label: 'Messages', icon: '✉️' },
@@ -21,14 +23,55 @@ export default function AdminPanel() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
+    let isMounted = true
+
+    const validateAdminAccess = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        if (isMounted) {
+          setAuthorized(false)
+          setChecking(false)
+          navigate('/')
+        }
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (!isMounted) return
+
+      if (profile?.role === 'super_admin') {
         setAuthorized(true)
       } else {
+        setAuthorized(false)
         navigate('/')
       }
+
       setChecking(false)
+    }
+
+    void validateAdminAccess()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setAuthorized(false)
+        setChecking(false)
+        navigate('/')
+        return
+      }
+
+      void validateAdminAccess()
     })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [navigate])
 
   if (checking) {
@@ -70,6 +113,7 @@ export default function AdminPanel() {
 
       {/* ── Main content ── */}
       <main className="admin-main">
+        {activeTab === 'create-admin' && <Admins />}
         {activeTab === 'menu-items' && <MenuItems />}
         {activeTab === 'orders' && <Orders />}
         {activeTab === 'messages' && <Messages />}

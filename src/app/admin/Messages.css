@@ -142,6 +142,110 @@
     font-size: .9rem;
 }
 
+/* ── Admins search ── */
+.admins-search {
+    margin-bottom: 18px;
+}
+
+.admins-search input {
+    width: 100%;
+    max-width: 360px;
+    padding: 10px 16px;
+    background: #1f0c04;
+    border: 1px solid #4a2812;
+    border-radius: 8px;
+    color: #f5e6c8;
+    font-size: .95rem;
+    outline: none;
+    transition: border-color .2s;
+}
+
+.admins-search input::placeholder {
+    color: #6b4226;
+}
+
+.admins-search input:focus {
+    border-color: #c9a87c;
+}
+
+/* ── Admins table ── */
+.admins-table {
+    width: 100%;
+    border: 1px solid #4a2812;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #1f0c04;
+}
+
+.admins-table-head {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr 1fr 160px;
+    padding: 16px 20px;
+    background: #35180b;
+    color: #9b6a39;
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.admins-table-row {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr 1fr 160px;
+    align-items: center;
+    padding: 16px 20px;
+    border-top: 1px solid #3b1b0b;
+    transition: background .2s;
+}
+
+.admins-table-row:hover {
+    background: #2a1408;
+}
+
+.admins-table-row span {
+    color: #f5e6c8;
+    font-size: .95rem;
+    word-break: break-word;
+}
+
+.admins-role-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 600;
+    background: #2c1a0a;
+    color: #c8994e;
+    border: 1px solid #5a3010;
+    text-transform: capitalize;
+}
+
+.admins-role-badge.super_admin {
+    background: #1e3a1e;
+    color: #7ed87e;
+    border-color: #3a6e3a;
+}
+
+.make-admin-btn {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid #7a4a1e;
+    background: #3a1e08;
+    color: #e8c98a;
+    font-size: .83rem;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+}
+
+.make-admin-btn:hover:not(:disabled) {
+    background: #5a2e10;
+    transform: translateY(-1px);
+}
+
+.make-admin-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 @media (max-width: 1100px) {
 
     .messages-table-head {

@@ -177,11 +177,17 @@
 }
 
 /* ── Section header ── */
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .admin-section-header {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 }
 
 .admin-section-title {
@@ -194,6 +200,94 @@
 .admin-section-count {
   font-size: 13px;
   color: #7a5c3e;
+}
+
+.admin-message {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(201, 168, 124, 0.12);
+  color: #f0d8b0;
+  border: 1px solid rgba(201, 168, 124, 0.2);
+}
+
+.admin-table-wrapper {
+  overflow-x: auto;
+  background: #1a0a00;
+  border: 1px solid rgba(201, 168, 124, 0.15);
+  border-radius: 10px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(201, 168, 124, 0.12);
+}
+
+.admin-table th {
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #7a5c3e;
+  background: rgba(201, 168, 124, 0.06);
+}
+
+.admin-table td {
+  color: #e8d5b7;
+}
+
+.admin-role-pill {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.admin-role-pill.customer {
+  background: rgba(122, 92, 62, 0.2);
+  color: #d7b17b;
+}
+
+.admin-role-pill.super_admin {
+  background: rgba(201, 168, 124, 0.2);
+  color: #f0d8b0;
+}
+
+.admin-action-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #c9a87c;
+  color: #120700;
+  font-family: 'Georgia', serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.admin-action-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.admin-action-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.admin-empty {
+  padding: 20px;
+  border-radius: 10px;
+  background: #1a0a00;
+  border: 1px solid rgba(201, 168, 124, 0.15);
+  color: #d9c0a0;
 }
 
 /* ── Form card ── */
@@ -311,7 +405,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
-  margin-bottom: 2px;
+  width: fit-content;
+}
+
+.admin-top-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .admin-btn-primary-catogory {
@@ -325,8 +425,11 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
-  margin-bottom: 2px;
-  margin-right: 10px;
+  width: fit-content;
+}
+
+.admin-btn-primary-catogory:hover {
+  background: #f0d8b0;
 }
 
 .admin-btn-primary-orders {
