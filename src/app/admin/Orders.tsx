@@ -20,7 +20,7 @@ interface Order {
   order_id: number
   customer_name: string
   phone: string
-  order_type: 'Takeaway' | 'Dine In'
+  order_type: 'Takeaway' | 'Home Delivery'
   total_value: number | string
   payment_status: boolean
   order_time: string

@@ -198,7 +198,7 @@ export default function Contact() {
             >
 
               <h2>
-                Send a Message/Inquiry/Review
+                Share Feedback or Ask Us Anything
               </h2>
 
 

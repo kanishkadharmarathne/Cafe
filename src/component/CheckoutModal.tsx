@@ -35,8 +35,11 @@ function formatExpiry(val: string) {
 export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: CheckoutModalProps) {
   const [step, setStep] = useState<Step>('details')
 
-  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '' })
+  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '', delivery_location: '' })
   const [detailsErrors, setDetailsErrors] = useState<Record<string, string>>({})
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null)
 
   const [cardType, setCardType] = useState<CardType>('')
   const [payment, setPayment] = useState({ holder: '', number: '', expiry: '', cvv: '' })
@@ -79,7 +82,58 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     if (!details.phone) e.phone = 'Phone number is required'
     else if (!/^\d{10}$/.test(details.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid 10-digit number'
     if (!details.order_type.trim()) e.order_type = 'Order type is required'
+    if (details.order_type === 'Home Delivery' && !details.delivery_location.trim()) {
+      e.delivery_location = 'Current location is required for home delivery'
+    }
     return e
+  }
+
+  function handleOrderTypeChange(nextType: 'Takeaway' | 'Home Delivery') {
+    setDetails((prev) => ({
+      ...prev,
+      order_type: nextType,
+      delivery_location: nextType === 'Takeaway' ? '' : prev.delivery_location,
+    }))
+
+    if (nextType === 'Takeaway') {
+      setLocationCoords(null)
+      setLocationError('')
+    }
+  }
+
+  function handleUseCurrentLocation() {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported in this browser.')
+      return
+    }
+
+    setLocationLoading(true)
+    setLocationError('')
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+
+        const value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+
+        setLocationCoords({ lat: latitude, lng: longitude })
+        setDetails((prev) => ({ ...prev, delivery_location: value }))
+        setLocationLoading(false)
+      },
+      (error) => {
+        setLocationLoading(false)
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Location permission denied. Please allow location access.')
+          return
+        }
+
+        setLocationError('Unable to get your current location. Please try again.')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      }
+    )
   }
 
   function validatePayment() {
@@ -128,19 +182,44 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     throw authError
   }
 
-  const { data: order, error: orderError } = await supabase
+  const baseOrderPayload = {
+    user_id: user?.id ?? null,
+    customer_name: details.name,
+    email: details.email,
+    phone: details.phone,
+    order_type: details.order_type,
+    total_value: grandTotal,
+    payment_status: true,
+  }
+
+  const locationPayload = details.order_type === 'Home Delivery'
+    ? {
+        ...baseOrderPayload,
+        delivery_location: details.delivery_location,
+        delivery_latitude: locationCoords?.lat ?? null,
+        delivery_longitude: locationCoords?.lng ?? null,
+      }
+    : baseOrderPayload
+
+  let orderResponse = await supabase
     .from("orders")
-    .insert({
-      user_id: user?.id ?? null,
-      customer_name: details.name,
-      email: details.email,
-      phone: details.phone,
-      order_type: details.order_type,
-      total_value: grandTotal,
-      payment_status: true
-    })
+    .insert(locationPayload)
     .select("order_id")
     .single();
+
+  if (
+    orderResponse.error &&
+    details.order_type === 'Home Delivery' &&
+    /delivery_location|delivery_latitude|delivery_longitude|column/i.test(orderResponse.error.message)
+  ) {
+    orderResponse = await supabase
+      .from("orders")
+      .insert(baseOrderPayload)
+      .select("order_id")
+      .single();
+  }
+
+  const { data: order, error: orderError } = orderResponse
 
 
   if (orderError) {
@@ -267,7 +346,7 @@ async function handlePaySubmit(e: React.FormEvent) {
                 <div className="order-type-container">
                   <div
                     className={`order-type-card ${details.order_type === 'Takeaway' ? 'active' : ''}`}
-                    onClick={() => setDetails({ ...details, order_type: 'Takeaway' })}
+                    onClick={() => handleOrderTypeChange('Takeaway')}
                   >
                     <span className="order-type-icon">🍱</span>
                     <h4>Takeaway</h4>
@@ -275,17 +354,55 @@ async function handlePaySubmit(e: React.FormEvent) {
                   </div>
 
                   <div
-                    className={`order-type-card ${details.order_type === 'Dine In' ? 'active' : ''}`}
-                    onClick={() => setDetails({ ...details, order_type: 'Dine In' })}
+                    className={`order-type-card ${details.order_type === 'Home Delivery' ? 'active' : ''}`}
+                    onClick={() => handleOrderTypeChange('Home Delivery')}
                   >
-                    <span className="order-type-icon">🍽️</span>
-                    <h4>Dine In</h4>
-                    <p>Enjoy your meal at the restaurant.</p>
+                    <span className="order-type-icon">🚚</span>
+                    <h4>Home Delivery</h4>
+                    <p>Deliver your order to your current location.</p>
                   </div>
                 </div>
 
                 {detailsErrors.order_type && (
                   <span className="co-err">{detailsErrors.order_type}</span>
+                )}
+
+                {details.order_type === 'Home Delivery' && (
+                  <div className="co-delivery-location">
+                    <button
+                      type="button"
+                      className="co-location-btn"
+                      onClick={handleUseCurrentLocation}
+                      disabled={locationLoading}
+                    >
+                      {locationLoading ? 'Getting current location...' : 'Use Current Location'}
+                    </button>
+
+                    <input
+                      type="text"
+                      placeholder="Delivery location"
+                      value={details.delivery_location}
+                      onChange={(e) => setDetails({ ...details, delivery_location: e.target.value })}
+                      className={detailsErrors.delivery_location ? 'err' : ''}
+                    />
+
+                    {detailsErrors.delivery_location && (
+                      <span className="co-err">{detailsErrors.delivery_location}</span>
+                    )}
+
+                    {locationError && <span className="co-err">{locationError}</span>}
+
+                    {locationCoords && (
+                      <div className="co-map-preview">
+                        <iframe
+                          title="Current delivery location"
+                          src={`https://maps.google.com/maps?q=${locationCoords.lat},${locationCoords.lng}&z=16&output=embed`}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -438,6 +555,11 @@ async function handlePaySubmit(e: React.FormEvent) {
             <p className="co-confirm-note">
               A confirmation will be sent to <strong>{details.email}</strong>
             </p>
+            {details.order_type === 'Home Delivery' && details.delivery_location && (
+              <p className="co-confirm-note">
+                Delivery location: <strong>{details.delivery_location}</strong>
+              </p>
+            )}
             <button className="co-submit" onClick={() => { onSuccess(); onClose() }}>
               Back to Menu
             </button>

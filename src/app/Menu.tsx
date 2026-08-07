@@ -35,39 +35,6 @@ interface CartEntry {
   amount: number
 }
 
-interface OrderItem {
-  id: number
-  item_name: string
-  quantity: number
-  amount?: number | null
-}
-
-interface Order {
-  order_id: number
-  order_type: 'Takeaway' | 'Dine In'
-  total_value: number | string
-  order_time: string
-  payment_status: boolean
-  processing_status: boolean
-  is_ready: boolean
-  delivery_status: boolean
-  order_items: OrderItem[] | null
-}
-
-function getPaymentStatus(order: Order) {
-  return order.payment_status ? 'Paid' : 'Pending'
-}
-
-function getProcessingStatus(order: Order) {
-  if (order.is_ready) return 'Completed'
-  if (order.processing_status) return 'Preparing'
-  return 'Pending'
-}
-
-function getDeliveryStatus(order: Order) {
-  return order.delivery_status ? 'Delivered' : 'Pending'
-}
-
 function getCategoryRef(item: MenuItem) {
   if (!item.categories) return null
   return Array.isArray(item.categories)
@@ -87,52 +54,9 @@ export default function Menu() {
   const [added, setAdded] = useState<Record<string, boolean>>({})
 
   const [showCheckout, setShowCheckout] = useState(false)
-  const [showOrderHistory, setShowOrderHistory] = useState(false)
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loadingOrders, setLoadingOrders] = useState(false)
-
-  async function fetchOrders() {
-
-    setLoadingOrders(true)
-
-    const {
-      data: { user },
-      error: authError
-    } = await supabase.auth.getUser()
-
-
-    if (authError || !user) {
-      console.error('User not logged in')
-      setOrders([])
-      setLoadingOrders(false)
-      return
-    }
-
-
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items(*)
-      `)
-      .eq('user_id', user.id)
-      .order('order_time', { ascending: false })
-
-
-    if (error) {
-      console.error(error)
-      setLoadingOrders(false)
-      return
-    }
-
-
-    setOrders(data || [])
-    setLoadingOrders(false)
-  }
+  const [checkoutMessage, setCheckoutMessage] = useState('')
 
   useEffect(() => {
-    fetchOrders();
-
     async function fetchMenu(){
 
       const { data, error } = await supabase
@@ -249,10 +173,6 @@ export default function Menu() {
 
   }
 
-
-
-
-
   function increment(id:string){
 
     setCart(prev=>
@@ -273,9 +193,6 @@ export default function Menu() {
     )
 
   }
-
-
-
 
   function decrement(id:string){
 
@@ -300,10 +217,6 @@ export default function Menu() {
 
   }
 
-
-
-
-
   function removeItem(id:string){
 
     setCart(prev=>
@@ -312,6 +225,21 @@ export default function Menu() {
 
     )
 
+  }
+
+  async function handleCheckoutClick() {
+    const {
+      data: { user },
+      error
+    } = await supabase.auth.getUser()
+
+    if (error || !user) {
+      setCheckoutMessage('Please sign in or log in before placing an order.')
+      return
+    }
+
+    setCheckoutMessage('')
+    setShowCheckout(true)
   }
 
 
@@ -323,18 +251,11 @@ export default function Menu() {
     0
   )
 
-
   const grandTotal = cart.reduce(
     (sum,item)=>
       sum+(item.amount*item.qty),
     0
   )
-
-  const activeOrders = orders.filter(order => !order.delivery_status)
-
-  
-
-
 
   return (
 
@@ -360,198 +281,6 @@ export default function Menu() {
         </p>
 
       </div>
-
-      <div className="order-history">
-
-  <div className="order-history-header">
-    <h2>My Orders</h2>
-
-    <button className="admin-btn-primary-orders" onClick={() => setShowOrderHistory(true)}>
-      Order History
-    </button>
-  </div>
-
-
-  {loadingOrders ? (
-    <p>Loading orders...</p>
-  ) : activeOrders.length === 0 ? (
-    <p>No active orders found.</p>
-  ) : (
-
-    activeOrders.map((order) => (
-
-      <div className="order-card" key={order.order_id}>
-
-        <div className="order-header">
-          <h3>
-            Order #{order.order_id}
-          </h3>
-
-          <span>
-            {new Date(order.order_time).toLocaleDateString()}
-          </span>
-        </div>
-
-        <div className="order-status-row">
-          <span className={`order-status-badge ${order.payment_status ? 'is-paid' : 'is-pending'}`}>
-            Payment: {getPaymentStatus(order)}
-          </span>
-
-          <span className={`order-status-badge ${order.is_ready ? 'is-ready' : order.processing_status ? 'is-progress' : 'is-pending'}`}>
-            Kitchen: {getProcessingStatus(order)}
-          </span>
-
-          <span className={`order-status-badge ${order.delivery_status ? 'is-ready' : 'is-pending'}`}>
-            Delivery: {getDeliveryStatus(order)}
-          </span>
-        </div>
-
-
-        <p>
-          Type: {order.order_type}
-        </p>
-
-        <p>
-          Total: ₹{order.total_value}
-        </p>
-
-
-        <h4>Items</h4>
-
-        <ul>
-          {(order.order_items ?? []).map((item) => (
-
-            <li key={item.id}>
-              {item.item_name} × {item.quantity}
-              {item.amount != null ? ` - ₹${item.amount * item.quantity}` : ''}
-            </li>
-
-          ))}
-        </ul>
-
-
-      </div>
-
-    ))
-
-  )}
-
-
-
-        {
-          showOrderHistory &&
-
-          <div
-            className="order-history-modal-overlay"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) {
-                setShowOrderHistory(false)
-              }
-            }}
-          >
-
-            <div className="order-history-modal" role="dialog" aria-modal="true" aria-label="Order history">
-
-              <div className="order-history-modal-header">
-                <div>
-                  <span className="page-eyebrow">
-                    Your Order
-                  </span>
-
-                  <h2>
-                    Order History
-                  </h2>
-                </div>
-
-                <button
-                  className="order-history-close"
-                  onClick={() => setShowOrderHistory(false)}
-                  aria-label="Close order history"
-                >
-                  ✕
-                </button>
-              </div>
-
-
-              <div className="order-history-modal-body">
-
-                {loadingOrders ? (
-                  <p>Loading orders...</p>
-                ) : orders.length === 0 ? (
-                  <p>No orders found.</p>
-                ) : (
-
-                  orders.map((order) => (
-
-                    <div className="order-card order-card-history" key={`history-${order.order_id}`}>
-
-                      <div className="order-header">
-                        <h3>
-                          Order #{order.order_id}
-                        </h3>
-
-                        <span>
-                          {new Date(order.order_time).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <div className="order-status-row">
-                        <span className={`order-status-badge ${order.payment_status ? 'is-paid' : 'is-pending'}`}>
-                          Payment: {getPaymentStatus(order)}
-                        </span>
-
-                        <span className={`order-status-badge ${order.is_ready ? 'is-ready' : order.processing_status ? 'is-progress' : 'is-pending'}`}>
-                          Kitchen: {getProcessingStatus(order)}
-                        </span>
-
-                        <span className={`order-status-badge ${order.delivery_status ? 'is-ready' : 'is-pending'}`}>
-                          Delivery: {getDeliveryStatus(order)}
-                        </span>
-                      </div>
-
-
-                      <p>
-                        Type: {order.order_type}
-                      </p>
-
-                      <p>
-                        Total: ₹{order.total_value}
-                      </p>
-
-
-                      <h4>Items</h4>
-
-                      <ul>
-                        {(order.order_items ?? []).map((item) => (
-
-                          <li key={item.id}>
-                            {item.item_name} × {item.quantity}
-                            {item.amount != null ? ` - ₹${item.amount * item.quantity}` : ''}
-                          </li>
-
-                        ))}
-                      </ul>
-
-
-                    </div>
-
-                  ))
-
-                )}
-
-              </div>
-
-            </div>
-
-          </div>
-
-        }
-
-
-</div>
-
-
-
       {
         cart.length > 0 &&
 
@@ -708,9 +437,17 @@ export default function Menu() {
 
 
 
-            <button className="btn-checkout-full" onClick={() => setShowCheckout(true)}>
-              Proceed to Checkout →
-            </button>
+            <div className="checkout-action">
+              <button className="btn-checkout-full" onClick={handleCheckoutClick}>
+                Proceed to Checkout →
+              </button>
+
+              {checkoutMessage && (
+                <p className="checkout-message">
+                  {checkoutMessage}
+                </p>
+              )}
+            </div>
 
 
 
@@ -836,70 +573,28 @@ export default function Menu() {
                           ₹{menuItem.price}
 
                         </span>
-
-
-
-
                         <div className="menu-item-actions">
-
-
                           <button
                             className={`menu-btn-cart ${added[menuItem.id] ? 'added' : ''}`}
                             onClick={() => handleAddToCart(menuItem)}
                           >
                             {added[menuItem.id] ? '✓ Added' : '+ Cart'}
                           </button>
-
-
-
-
-                          <button className="menu-btn-buy">
-
-                            Buy Now
-
-                          </button>
-
-
                         </div>
-
-
-
                       </div>
-
-
-
 
                     </div>
 
 
                   ))
                 }
-
-
               </div>
-
-
-
             </section>
-
-
           )
 
-
         })
-
-
       }
-
-
-
-
     </main>
-
-
-
-
-
     {
       showCheckout &&
 
@@ -920,7 +615,6 @@ export default function Menu() {
 
         onSuccess={() => {
           setCart([])
-          fetchOrders()
         }}
 
 

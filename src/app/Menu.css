@@ -414,6 +414,22 @@
   transform: translateY(-1px);
 }
 
+.checkout-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.checkout-message {
+  margin: 0;
+  max-width: 260px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e08a8a;
+  text-align: right;
+}
+
 /* ── Menu item right-side layout ── */
 .menu-item-right {
   display: flex;
@@ -523,5 +539,15 @@
 
   .menu-item-actions {
     flex-wrap: wrap;
+  }
+
+  .checkout-action {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .checkout-message {
+    max-width: none;
+    text-align: left;
   }
 }

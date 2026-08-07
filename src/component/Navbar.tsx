@@ -70,6 +70,11 @@ export default function Navbar() {
           <NavLink to="/menu" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Menu
           </NavLink>
+          {userName && (
+            <NavLink to="/my-orders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              My Orders
+            </NavLink>
+          )}
           <NavLink to="/contact" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Contact
           </NavLink>
