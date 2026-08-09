@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import './Footer.css'
+import { IoCall } from "react-icons/io5";
+import { IoMdMail } from "react-icons/io";
 
 export default function Footer() {
   return (
@@ -47,8 +49,8 @@ export default function Footer() {
             <li><span>Sunday</span><span>8:00 AM – 10:00 PM</span></li>
           </ul>
           <div className="footer-contact-row">
-            <a href="tel:+919876543210">📞 +91 98765 43210</a>
-            <a href="mailto:hello@brewedbliss.in">✉️ hello@brewedbliss.in</a>
+            <a href="tel:+919876543210"><IoCall /> +91 98765 43210</a>
+            <a href="mailto:hello@brewedbliss.in"><IoMdMail /> hello@brewedbliss.in</a>
           </div>
         </div>
 

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import './Pages.css'
 import { supabase } from '../lib/supabase'
+import { IoCall } from "react-icons/io5";
+import { IoLocationSharp } from "react-icons/io5";
+import { FaClock } from "react-icons/fa";
+import { IoMdMail } from "react-icons/io";
 
 interface Message {
   id: string
@@ -131,7 +135,7 @@ export default function Contact() {
           <h2>Visit Us</h2>
 
           <div className="contact-detail">
-            <span className="contact-icon">📍</span>
+            <span className="contact-icon"><IoLocationSharp /></span>
             <div>
               <strong>Address</strong>
               <p>
@@ -144,7 +148,7 @@ export default function Contact() {
 
 
           <div className="contact-detail">
-            <span className="contact-icon">🕐</span>
+            <span className="contact-icon"><FaClock /></span>
             <div>
               <strong>Hours</strong>
               <p>
@@ -157,7 +161,7 @@ export default function Contact() {
 
 
           <div className="contact-detail">
-            <span className="contact-icon">📞</span>
+            <span className="contact-icon"><IoCall /></span>
             <div>
               <strong>Phone</strong>
               <p>+91 98765 43210</p>
@@ -166,7 +170,7 @@ export default function Contact() {
 
 
           <div className="contact-detail">
-            <span className="contact-icon">✉️</span>
+            <span className="contact-icon"><IoMdMail /></span>
             <div>
               <strong>Email</strong>
               <p>hello@brewedbliss.in</p>

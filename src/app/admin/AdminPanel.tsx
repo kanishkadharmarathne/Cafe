@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import MenuItems from './MenuItems'
@@ -6,14 +6,21 @@ import './AdminPanel.css'
 import Messages from './Messages'
 import Orders from './Orders'
 import Admins from './admins'
+import Dashboard from './dashboard'
+import { FaUser } from "react-icons/fa";
+import { MdMenuBook } from "react-icons/md";
+import { MdBorderColor } from "react-icons/md";
+import { FaMessage } from "react-icons/fa6";
+import { AiFillDashboard } from "react-icons/ai";
 
-type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin'
+type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin' | 'dashboard'
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'create-admin', label: 'Create Admin', icon: '➕' },
-  { id: 'menu-items', label: 'Menu Items', icon: '🍽️' },
-  { id: 'orders', label: 'Orders', icon: '🧾' },
-  { id: 'messages', label: 'Messages', icon: '✉️' },
+const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: <AiFillDashboard /> },
+  { id: 'create-admin', label: 'Create Admin', icon: <FaUser /> },
+  { id: 'menu-items', label: 'Menu Items', icon: <MdMenuBook /> },
+  { id: 'orders', label: 'Orders', icon: <MdBorderColor /> },
+  { id: 'messages', label: 'Messages', icon: <FaMessage /> },
 ]
 
 export default function AdminPanel() {
@@ -113,6 +120,7 @@ export default function AdminPanel() {
 
       {/* ── Main content ── */}
       <main className="admin-main">
+        {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'create-admin' && <Admins />}
         {activeTab === 'menu-items' && <MenuItems />}
         {activeTab === 'orders' && <Orders />}

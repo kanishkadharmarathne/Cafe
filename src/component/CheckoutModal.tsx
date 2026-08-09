@@ -35,7 +35,7 @@ function formatExpiry(val: string) {
 export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: CheckoutModalProps) {
   const [step, setStep] = useState<Step>('details')
 
-  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '', delivery_location: '' })
+  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '', delivery_address: '' })
   const [detailsErrors, setDetailsErrors] = useState<Record<string, string>>({})
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -82,8 +82,8 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     if (!details.phone) e.phone = 'Phone number is required'
     else if (!/^\d{10}$/.test(details.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid 10-digit number'
     if (!details.order_type.trim()) e.order_type = 'Order type is required'
-    if (details.order_type === 'Home Delivery' && !details.delivery_location.trim()) {
-      e.delivery_location = 'Current location is required for home delivery'
+    if (details.order_type === 'Home Delivery' && !details.delivery_address.trim()) {
+      e.delivery_address = 'Current location is required for home delivery'
     }
     return e
   }
@@ -92,7 +92,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
     setDetails((prev) => ({
       ...prev,
       order_type: nextType,
-      delivery_location: nextType === 'Takeaway' ? '' : prev.delivery_location,
+      delivery_address: nextType === 'Takeaway' ? '' : prev.delivery_address,
     }))
 
     if (nextType === 'Takeaway') {
@@ -117,7 +117,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
         const value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
 
         setLocationCoords({ lat: latitude, lng: longitude })
-        setDetails((prev) => ({ ...prev, delivery_location: value }))
+        setDetails((prev) => ({ ...prev, delivery_address: value }))
         setLocationLoading(false)
       },
       (error) => {
@@ -195,7 +195,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
   const locationPayload = details.order_type === 'Home Delivery'
     ? {
         ...baseOrderPayload,
-        delivery_location: details.delivery_location,
+        delivery_address: details.delivery_address,
         delivery_latitude: locationCoords?.lat ?? null,
         delivery_longitude: locationCoords?.lng ?? null,
       }
@@ -210,7 +210,7 @@ export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: 
   if (
     orderResponse.error &&
     details.order_type === 'Home Delivery' &&
-    /delivery_location|delivery_latitude|delivery_longitude|column/i.test(orderResponse.error.message)
+    /delivery_address|delivery_latitude|delivery_longitude|column/i.test(orderResponse.error.message)
   ) {
     orderResponse = await supabase
       .from("orders")
@@ -381,13 +381,13 @@ async function handlePaySubmit(e: React.FormEvent) {
                     <input
                       type="text"
                       placeholder="Delivery location"
-                      value={details.delivery_location}
-                      onChange={(e) => setDetails({ ...details, delivery_location: e.target.value })}
-                      className={detailsErrors.delivery_location ? 'err' : ''}
+                      value={details.delivery_address}
+                      onChange={(e) => setDetails({ ...details, delivery_address: e.target.value })}
+                      className={detailsErrors.delivery_address ? 'err' : ''}
                     />
 
-                    {detailsErrors.delivery_location && (
-                      <span className="co-err">{detailsErrors.delivery_location}</span>
+                    {detailsErrors.delivery_address && (
+                      <span className="co-err">{detailsErrors.delivery_address}</span>
                     )}
 
                     {locationError && <span className="co-err">{locationError}</span>}
@@ -555,9 +555,9 @@ async function handlePaySubmit(e: React.FormEvent) {
             <p className="co-confirm-note">
               A confirmation will be sent to <strong>{details.email}</strong>
             </p>
-            {details.order_type === 'Home Delivery' && details.delivery_location && (
+            {details.order_type === 'Home Delivery' && details.delivery_address && (
               <p className="co-confirm-note">
-                Delivery location: <strong>{details.delivery_location}</strong>
+                Delivery location: <strong>{details.delivery_address}</strong>
               </p>
             )}
             <button className="co-submit" onClick={() => { onSuccess(); onClose() }}>

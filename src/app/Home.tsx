@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import './Pages.css'
+import { IoLocationSharp } from "react-icons/io5";
+import { FaClock } from "react-icons/fa";
 
 const features = [
   {
@@ -129,8 +131,8 @@ export default function Home() {
             and the coffee is ready. We'd love to see you.
           </p>
           <div className="home-callout-meta">
-            <span>📍 12, Coffee Lane, MG Road, Bengaluru</span>
-            <span>🕐 Mon–Fri 7 AM – 9 PM · Weekends 8 AM – 10 PM</span>
+            <span><IoLocationSharp/> 12, Coffee Lane, MG Road, Bengaluru</span>
+            <span><FaClock/> Mon–Fri 7 AM – 9 PM · Weekends 8 AM – 10 PM</span>
           </div>
           <button className="btn-primary" onClick={() => navigate('/contact')}>
             Get Directions
