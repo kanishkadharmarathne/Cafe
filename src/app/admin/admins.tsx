@@ -35,11 +35,50 @@ export default function Admins() {
   async function makeAdmin(profile: Profile) {
     const { error } = await supabase
       .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', profile.id);
+
+    if (error) {
+      console.error('Error updating role:', error);
+    } else {
+      await fetchProfiles();
+    }
+  }
+
+  async function makeSuperAdmin(profile: Profile) {
+    const { error } = await supabase
+      .from('profiles')
       .update({ role: 'super_admin' })
       .eq('id', profile.id);
 
     if (error) {
       console.error('Error updating role:', error);
+    } else {
+      await fetchProfiles();
+    }
+  }
+
+  async function demoteToAdmin(profile: Profile) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', profile.id);
+
+    if (error) {
+      console.error('Error demoting to admin:', error);
+    } else {
+      await fetchProfiles();
+    }
+  }
+
+  async function demoteToCustomer(profile: Profile) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'customer' })
+      .eq('id', profile.id);
+
+    if (error) {
+      console.error('Error demoting to customer:', error);
     } else {
       await fetchProfiles();
     }
@@ -66,48 +105,90 @@ export default function Admins() {
       ) : profiles.length === 0 ? (
         <div className="empty">No profiles found.</div>
       ) : (
-        <div className="admins-table">
-          <div className="admins-table-head">
-            <span>Name</span>
-            <span>Email</span>
-            <span>Role</span>
-            <span>Action</span>
-          </div>
-
-          {profiles
-            .filter((profile) => {
+        <>
+          {(['super_admin', 'admin', 'customer'] as const).map((group) => {
+            const filtered = profiles.filter((p) => {
+              const role = typeof p.role === 'string' ? p.role : 'customer';
+              if (role !== group) return false;
               const kw = search.toLowerCase();
               return (
-                (typeof profile.name === 'string' && profile.name.toLowerCase().includes(kw)) ||
-                (typeof profile.email === 'string' && profile.email.toLowerCase().includes(kw)) ||
-                (typeof profile.role === 'string' && profile.role.toLowerCase().includes(kw))
+                (typeof p.name === 'string' && p.name.toLowerCase().includes(kw)) ||
+                (typeof p.email === 'string' && p.email.toLowerCase().includes(kw)) ||
+                (typeof p.role === 'string' && p.role.toLowerCase().includes(kw))
               );
-            })
-            .map((profile) => {
-            const name = typeof profile.name === 'string' ? profile.name : 'No name';
-            const email = typeof profile.email === 'string' ? profile.email : 'No email';
-            const role = typeof profile.role === 'string' ? profile.role : 'user';
+            });
+
+            if (filtered.length === 0) return null;
+
+            const groupLabel =
+              group === 'super_admin' ? 'Super Admins' :
+              group === 'admin' ? 'Admins' : 'Customers';
 
             return (
-              <div key={profile.id as string} className="admins-table-row">
-                <span>{name}</span>
-                <span>{email}</span>
-                <span>
-                  <span className={`admins-role-badge ${role}`}>{role}</span>
-                </span>
-                <span>
-                  <button
-                    className="make-admin-btn"
-                    onClick={() => void makeAdmin(profile)}
-                    disabled={role === 'super_admin'}
-                  >
-                    {role === 'super_admin' ? 'Already Admin' : 'Make Super Admin'}
-                  </button>
-                </span>
+              <div key={group} className="admins-group">
+                <div className="admins-group-divider">
+                  <span className={`admins-group-label ${group}`}>{groupLabel}</span>
+                  <span className="admins-group-count">{filtered.length}</span>
+                </div>
+                <div className="admins-table">
+                  <div className="admins-table-head">
+                    <span>Name</span>
+                    <span>Email</span>
+                    <span>Role</span>
+                    <span>Action</span>
+                  </div>
+                  {filtered.map((profile) => {
+                    const name = typeof profile.name === 'string' ? profile.name : 'No name';
+                    const email = typeof profile.email === 'string' ? profile.email : 'No email';
+                    const role = typeof profile.role === 'string' ? profile.role : 'customer';
+
+                    return (
+                      <div key={profile.id as string} className="admins-table-row">
+                        <span>{name}</span>
+                        <span>{email}</span>
+                        <span>
+                          <span className={`admins-role-badge ${role}`}>{role}</span>
+                        </span>
+                        <span className="admins-action-btns">
+                          <button
+                            className="make-admin-btn"
+                            onClick={() => void makeAdmin(profile)}
+                            disabled={role === 'admin' || role === 'super_admin'}
+                          >
+                            {role === 'admin' ? 'Admin ✓' : 'Make Admin'}
+                          </button>
+                          <button
+                            className="make-admin-btn make-super-admin-btn"
+                            onClick={() => void makeSuperAdmin(profile)}
+                            disabled={role === 'super_admin'}
+                          >
+                            {role === 'super_admin' ? 'Super Admin ✓' : 'Make Super Admin'}
+                          </button>
+                          {role === 'super_admin' && (
+                            <button
+                              className="make-admin-btn demote-btn"
+                              onClick={() => void demoteToAdmin(profile)}
+                            >
+                              ↓ Demote to Admin
+                            </button>
+                          )}
+                          {role === 'admin' && (
+                            <button
+                              className="make-admin-btn demote-btn"
+                              onClick={() => void demoteToCustomer(profile)}
+                            >
+                              ↓ Demote to Customer
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
-        </div>
+        </>
       )}
     </div>
   );

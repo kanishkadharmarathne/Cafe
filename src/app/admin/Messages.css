@@ -246,6 +246,76 @@
     cursor: default;
 }
 
+.admins-action-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admins-group {
+    margin-bottom: 28px;
+}
+
+.admins-group-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #3a2a1a;
+}
+
+.admins-group-label {
+    font-size: .95rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: 3px 14px;
+    border-radius: 20px;
+}
+
+.admins-group-label.super_admin {
+    background: #2a0e48;
+    color: #d4a8f0;
+    border: 1px solid #6a3a8e;
+}
+
+.admins-group-label.admin {
+    background: #3a1e08;
+    color: #e8c98a;
+    border: 1px solid #7a4a1e;
+}
+
+.admins-group-label.customer {
+    background: #0e2a1a;
+    color: #a8e8c0;
+    border: 1px solid #2a7a4a;
+}
+
+.admins-group-count {
+    font-size: .82rem;
+    color: #a08060;
+}
+
+.make-super-admin-btn {
+    border-color: #6a3a8e;
+    background: #2a0e48;
+    color: #d4a8f0;
+}
+
+.make-super-admin-btn:hover:not(:disabled) {
+    background: #4a1e78;
+}
+
+.demote-btn {
+    border-color: #8e3a3a;
+    background: #3a0e0e;
+    color: #f0a8a8;
+}
+
+.demote-btn:hover:not(:disabled) {
+    background: #6a1e1e;
+}
+
 @media (max-width: 1100px) {
 
     .messages-table-head {
