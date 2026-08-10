@@ -4,12 +4,6 @@ import './Menu.css'
 import CheckoutModal from '../component/CheckoutModal'
 import { supabase } from '../lib/supabase'
 
-const CATEGORY_ICONS: Record<string, string> = {
-  'Espresso & Coffee': '☕',
-  'Specialty Drinks': '✨',
-  'Food & Bakes': '🥐',
-}
-
 
 interface MenuItem {
   id: string
@@ -18,13 +12,11 @@ interface MenuItem {
   portion: string
   description: string
   price: number
-  categories: {
-    id: string
-    category_name: string
-  } | {
-    id: string
-    category_name: string
-  }[] | null
+}
+
+interface Category {
+  id: string
+  category_name: string
 }
 
 
@@ -35,18 +27,12 @@ interface CartEntry {
   amount: number
 }
 
-function getCategoryRef(item: MenuItem) {
-  if (!item.categories) return null
-  return Array.isArray(item.categories)
-    ? item.categories[0] || null
-    : item.categories
-}
-
 
 
 export default function Menu() {
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [menuLoading, setMenuLoading] = useState(true)
 
   const [cart, setCart] = useState<CartEntry[]>([])
@@ -58,18 +44,32 @@ export default function Menu() {
 
   useEffect(() => {
     async function fetchMenu(){
+      setMenuLoading(true)
+
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('id, category_name')
+        .order('category_name')
 
       const { data, error } = await supabase
         .from('menu_items')
         .select(`
-          *,
-          categories (
-            id,
-            category_name
-          )
+          id,
+          category_id,
+          item,
+          portion,
+          description,
+          price
         `)
         .eq('status', true)
         .order('item')
+
+
+      if (!categoriesError && categoriesData) {
+        setCategories(categoriesData)
+      } else if (categoriesError) {
+        console.error('Failed to fetch categories:', categoriesError)
+      }
 
 
       if (!error && data) {
@@ -89,24 +89,28 @@ export default function Menu() {
 
 
 
+  const categoryNameById = new Map(
+    categories.map((category) => [category.id, category.category_name])
+  )
+
   const groupedMenu = Array.from(
     menuItems.reduce((groups, item) => {
-      const relatedCategory = getCategoryRef(item)
-      const categoryName = relatedCategory?.category_name || 'Uncategorized'
-      const categoryKey = relatedCategory?.id || item.category_id || 'uncategorized'
+      const categoryKey = item.category_id || 'uncategorized'
+      const categoryName = item.category_id
+        ? categoryNameById.get(item.category_id) || 'Uncategorized'
+        : 'Uncategorized'
 
       if (!groups.has(categoryKey)) {
         groups.set(categoryKey, {
           key: categoryKey,
           name: categoryName,
-          icon: CATEGORY_ICONS[categoryName] || '☕',
           items: [] as MenuItem[],
         })
       }
 
       groups.get(categoryKey)?.items.push(item)
       return groups
-    }, new Map<string, { key: string; name: string; icon: string; items: MenuItem[] }>() ).values()
+    }, new Map<string, { key: string; name: string; items: MenuItem[] }>() ).values()
   )
 
   function handleAddToCart(menuItem:MenuItem){
@@ -500,11 +504,6 @@ export default function Menu() {
 
 
               <h2 className="menu-category">
-
-                <span>
-                  {group.icon}
-                </span>
-
                 {group.name}
 
               </h2>

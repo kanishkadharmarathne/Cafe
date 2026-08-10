@@ -7,13 +7,16 @@ import Messages from './Messages'
 import Orders from './Orders'
 import Admins from './admins'
 import Dashboard from './dashboard'
+import DiOrders from './DiOrders'
 import { FaUser } from "react-icons/fa";
 import { MdMenuBook } from "react-icons/md";
 import { MdBorderColor } from "react-icons/md";
 import { FaMessage } from "react-icons/fa6";
 import { AiFillDashboard } from "react-icons/ai";
+import { SiAirtable } from "react-icons/si";
 
-type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin' | 'dashboard'
+type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin' | 'dashboard' |'di-orders'
+type AdminRole = 'admin' | 'super_admin'
 
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <AiFillDashboard /> },
@@ -21,12 +24,14 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'menu-items', label: 'Menu Items', icon: <MdMenuBook /> },
   { id: 'orders', label: 'Orders', icon: <MdBorderColor /> },
   { id: 'messages', label: 'Messages', icon: <FaMessage /> },
+  { id: 'di-orders', label: 'Dine in Orders', icon: <SiAirtable /> },
 ]
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('menu-items')
   const [checking, setChecking] = useState(true)
   const [authorized, setAuthorized] = useState(false)
+  const [role, setRole] = useState<AdminRole | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -52,10 +57,12 @@ export default function AdminPanel() {
 
       if (!isMounted) return
 
-      if (profile?.role === 'super_admin') {
+      if (profile?.role === 'admin' || profile?.role === 'super_admin') {
         setAuthorized(true)
+        setRole(profile.role as AdminRole)
       } else {
         setAuthorized(false)
+        setRole(null)
         navigate('/')
       }
 
@@ -67,6 +74,7 @@ export default function AdminPanel() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
         setAuthorized(false)
+        setRole(null)
         setChecking(false)
         navigate('/')
         return
@@ -81,6 +89,12 @@ export default function AdminPanel() {
     }
   }, [navigate])
 
+  useEffect(() => {
+    if (role !== 'super_admin' && (activeTab === 'dashboard' || activeTab === 'create-admin')) {
+      setActiveTab('menu-items')
+    }
+  }, [activeTab, role])
+
   if (checking) {
     return (
       <div className="admin-gate">
@@ -90,6 +104,10 @@ export default function AdminPanel() {
   }
 
   if (!authorized) return null
+
+  const visibleTabs = role === 'super_admin'
+    ? TABS
+    : TABS.filter((tab) => tab.id !== 'dashboard' && tab.id !== 'create-admin')
 
   return (
     <div className="admin-layout">
@@ -101,7 +119,7 @@ export default function AdminPanel() {
         </div>
 
         <nav className="admin-nav">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               className={`admin-nav-item ${activeTab === tab.id ? 'active' : ''}`}
@@ -121,10 +139,11 @@ export default function AdminPanel() {
       {/* ── Main content ── */}
       <main className="admin-main">
         {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'create-admin' && <Admins />}
+        {activeTab === 'create-admin' && role === 'super_admin' && <Admins />}
         {activeTab === 'menu-items' && <MenuItems />}
         {activeTab === 'orders' && <Orders />}
         {activeTab === 'messages' && <Messages />}
+        {activeTab === 'di-orders' && <DiOrders />}
       </main>
     </div>
   )

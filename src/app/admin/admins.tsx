@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import './Messages.css';
 
@@ -11,6 +12,61 @@ export default function Admins() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function validateAccess() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        if (isMounted) {
+          setAuthorized(false);
+          setCheckingAccess(false);
+          navigate('/');
+        }
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (profile?.role === 'super_admin') {
+        setAuthorized(true);
+      } else {
+        setAuthorized(false);
+        navigate('/');
+      }
+
+      setCheckingAccess(false);
+    }
+
+    void validateAccess();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setAuthorized(false);
+        setCheckingAccess(false);
+        navigate('/');
+        return;
+      }
+
+      void validateAccess();
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   async function fetchProfiles() {
     setLoading(true);
@@ -29,8 +85,12 @@ export default function Admins() {
   }
 
   useEffect(() => {
+    if (!authorized) {
+      return;
+    }
+
     void fetchProfiles();
-  }, []);
+  }, [authorized]);
 
   async function makeAdmin(profile: Profile) {
     const { error } = await supabase
@@ -84,6 +144,14 @@ export default function Admins() {
     }
   }
 
+  if (checkingAccess) {
+    return <div className="loading">Checking access...</div>;
+  }
+
+  if (!authorized) {
+    return null;
+  }
+
   return (
     <div className="admin-panel">
       <div className="admin-section-header">
@@ -91,14 +159,14 @@ export default function Admins() {
         <span className="admin-section-count">{profiles.length} Users</span>
       </div>
 
-        <div className="admins-search">
-            <input
-            type="text"
-            placeholder="Search by name, email or role…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            />
-        </div>
+      <div className="admins-search">
+        <input
+          type="text"
+          placeholder="Search by name, email or role…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       {loading ? (
         <div className="loading">Loading...</div>

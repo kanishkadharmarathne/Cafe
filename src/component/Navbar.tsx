@@ -8,7 +8,7 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -25,11 +25,11 @@ export default function Navbar() {
         if (!isMounted) return
 
         setUserName(displayName)
-        setIsSuperAdmin(profile?.role === 'super_admin')
+        setCanAccessAdmin(profile?.role === 'admin' || profile?.role === 'super_admin')
       } else {
         if (!isMounted) return
         setUserName(null)
-        setIsSuperAdmin(false)
+        setCanAccessAdmin(false)
       }
     }
 
@@ -50,7 +50,7 @@ export default function Navbar() {
   async function handleSignOut() {
     await supabase.auth.signOut()
     setUserName(null)
-    setIsSuperAdmin(false)
+    setCanAccessAdmin(false)
   }
 
   return (
@@ -87,7 +87,7 @@ export default function Navbar() {
           {userName ? (
             <>
               <span className="nav-user-name">{userName}</span>
-              {isSuperAdmin && (
+              {canAccessAdmin && (
                 <button className="nav-btn-admin" onClick={() => navigate('/admin')}>Admin</button>
               )}
               <button className="nav-btn-signout" onClick={handleSignOut}>Sign Out</button>

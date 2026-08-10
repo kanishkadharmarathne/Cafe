@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import './AdminPanel.css'
@@ -55,13 +56,72 @@ export default function Dashboard() {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([])
   const [loading, setLoading] = useState(true)
   const [itemsLoading, setItemsLoading] = useState(true)
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [authorized, setAuthorized] = useState(false)
   const [activeTab, setActiveTab] = useState<ReportTab>('date')
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1))
   const [selectedDate, setSelectedDate] = useState(String(new Date().getDate()))
   const [page, setPage] = useState(1)
+  const navigate = useNavigate()
 
   useEffect(() => {
+    let isMounted = true
+
+    const validateAccess = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        if (isMounted) {
+          setAuthorized(false)
+          setCheckingAccess(false)
+          navigate('/', { replace: true })
+        }
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (!isMounted) return
+
+      if (profile?.role === 'super_admin') {
+        setAuthorized(true)
+      } else {
+        setAuthorized(false)
+        navigate('/', { replace: true })
+      }
+
+      setCheckingAccess(false)
+    }
+
+    void validateAccess()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setAuthorized(false)
+        setCheckingAccess(false)
+        navigate('/', { replace: true })
+        return
+      }
+
+      void validateAccess()
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [navigate])
+
+  useEffect(() => {
+    if (!authorized) {
+      return
+    }
+
     async function fetchOrders() {
       setLoading(true)
       const { data, error } = await supabase
@@ -77,9 +137,13 @@ export default function Dashboard() {
     }
 
     void fetchOrders()
-  }, [])
+  }, [authorized])
 
   useEffect(() => {
+    if (!authorized) {
+      return
+    }
+
     async function fetchOrderItems() {
       setItemsLoading(true)
       const { data, error } = await supabase
@@ -94,7 +158,7 @@ export default function Dashboard() {
     }
 
     void fetchOrderItems()
-  }, [])
+  }, [authorized])
 
   useEffect(() => {
     setPage(1)
@@ -110,6 +174,16 @@ export default function Dashboard() {
       setSelectedYear(String(years[0]))
     }
   }, [orders, selectedYear])
+
+  if (checkingAccess) {
+    return (
+      <div className="dashboard-page">
+        <div className="loading">Checking access…</div>
+      </div>
+    )
+  }
+
+  if (!authorized) return null
 
   const years = Array.from(new Set(orders.map((order) => getOrderYear(order.order_time)))).sort((a, b) => a - b)
   const monthOptions = MONTH_NAMES.map((label, index) => ({ label, value: String(index + 1) }))
