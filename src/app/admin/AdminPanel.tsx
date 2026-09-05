@@ -14,6 +14,7 @@ import { MdBorderColor } from "react-icons/md";
 import { FaMessage } from "react-icons/fa6";
 import { AiFillDashboard } from "react-icons/ai";
 import { SiAirtable } from "react-icons/si";
+import { MdMenu } from "react-icons/md";
 
 type Tab = 'menu-items' | 'messages' | 'orders' | 'create-admin' | 'dashboard' |'di-orders'
 type AdminRole = 'admin' | 'super_admin'
@@ -32,6 +33,7 @@ export default function AdminPanel() {
   const [checking, setChecking] = useState(true)
   const [authorized, setAuthorized] = useState(false)
   const [role, setRole] = useState<AdminRole | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -111,19 +113,33 @@ export default function AdminPanel() {
 
   return (
     <div className="admin-layout">
+      <button
+        type="button"
+        className="admin-menu-toggle"
+        aria-label={menuOpen ? 'Close admin navigation' : 'Open admin navigation'}
+        aria-expanded={menuOpen}
+        aria-controls="admin-navigation"
+        onClick={() => setMenuOpen((isOpen) => !isOpen)}
+      >
+        <MdMenu aria-hidden="true" />
+      </button>
+
       {/* ── Sidebar ── */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="admin-brand">
           <span className="admin-brand-icon">☕</span>
           <span className="admin-brand-name">Admin</span>
         </div>
 
-        <nav className="admin-nav">
+        <nav id="admin-navigation" className="admin-nav">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               className={`admin-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                setMenuOpen(false)
+              }}
             >
               <span className="admin-nav-icon">{tab.icon}</span>
               <span>{tab.label}</span>

@@ -290,83 +290,85 @@ export default function MenuItems() {
                         className="admin-table-row"
                       >
                         <span className="admin-item-name">
-                          {menuItem.item}
+                          <span className="admin-item-value">{menuItem.item}</span>
                         </span>
 
                         <span>
-                          {menuItem.portion || '—'}
+                          <span className="admin-item-value">{menuItem.portion || '—'}</span>
                         </span>
 
                         <span>
-                          {menuItem.description || '—'}
+                          <span className="admin-item-value">{menuItem.description || '—'}</span>
                         </span>
 
                         <span>
-                          ₹{menuItem.price}
+                          <span className="admin-item-value">₹{menuItem.price}</span>
                         </span>
 
                         <span>
-                          <span
-                            className={`admin-status-badge ${
-                              menuItem.status
-                                ? 'active'
-                                : 'inactive'
-                            }`}
-                          >
-                            {menuItem.status
-                              ? 'Active'
-                              : 'Inactive'}
+                          <span className="admin-item-value">
+                            <span
+                              className={`admin-status-badge ${
+                                menuItem.status
+                                  ? 'active'
+                                  : 'inactive'
+                              }`}
+                            >
+                              {menuItem.status
+                                ? 'Active'
+                                : 'Inactive'}
+                            </span>
                           </span>
                         </span>
 
                         <span className="admin-item-actions">
+                          <span className="admin-item-action-buttons">
+                            {deleteConfirm === menuItem.id ? (
+                              <>
+                                <span className="admin-confirm-text">
+                                  Delete?
+                                </span>
 
-                          {deleteConfirm === menuItem.id ? (
-                            <>
-                              <span className="admin-confirm-text">
-                                Delete?
-                              </span>
+                                <button
+                                  className="admin-btn-delete"
+                                  onClick={() =>
+                                    handleDelete(menuItem.id)
+                                  }
+                                >
+                                  Yes
+                                </button>
 
-                              <button
-                                className="admin-btn-delete"
-                                onClick={() =>
-                                  handleDelete(menuItem.id)
-                                }
-                              >
-                                Yes
-                              </button>
+                                <button
+                                  className="admin-btn-secondary-sm"
+                                  onClick={() =>
+                                    setDeleteConfirm(null)
+                                  }
+                                >
+                                  No
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="admin-btn-edit"
+                                  onClick={() =>
+                                    handleEdit(menuItem)
+                                  }
+                                >
+                                  Edit
+                                </button>
 
-                              <button
-                                className="admin-btn-secondary-sm"
-                                onClick={() =>
-                                  setDeleteConfirm(null)
-                                }
-                              >
-                                No
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className="admin-btn-edit"
-                                onClick={() =>
-                                  handleEdit(menuItem)
-                                }
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                className="admin-btn-delete"
-                                onClick={() =>
-                                  setDeleteConfirm(menuItem.id)
-                                }
-                              >
-                                Delete
-                              </button>
-                            </>
-                          )}
-
+                                <button
+                                  className="admin-btn-delete"
+                                  onClick={() =>
+                                    setDeleteConfirm(menuItem.id)
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </span>
                         </span>
                       </div>
                     ))}

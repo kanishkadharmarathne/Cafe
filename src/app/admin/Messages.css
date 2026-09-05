@@ -279,6 +279,141 @@
     border: 1px solid #6a3a8e;
 }
 
+@media (max-width: 700px) {
+    .messages-table-head,
+    .admins-table-head {
+        display: none;
+    }
+
+    .messages-row,
+    .admins-table-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 9px;
+        padding: 16px;
+    }
+
+    .messages-row > span,
+    .admins-table-row > span {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        min-width: 0;
+        line-height: 1.45;
+    }
+
+    .messages-row > span::before,
+    .admins-table-row > span::before {
+        flex: 0 0 78px;
+        color: #9b6a39;
+        content: '';
+        font-size: .68rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .messages-row > span:nth-child(1)::before { content: 'Name'; }
+    .messages-row > span:nth-child(2)::before { content: 'Email'; }
+    .messages-row > span:nth-child(3)::before { content: 'Message'; }
+    .messages-row > span:nth-child(4)::before { content: 'Read'; }
+    .messages-row > span:nth-child(5)::before { content: 'Star'; }
+    .messages-row > span:nth-child(6)::before { content: 'Date'; }
+
+    .admins-table-row > span:nth-child(1)::before { content: 'Name'; }
+    .admins-table-row > span:nth-child(2)::before { content: 'Email'; }
+    .admins-table-row > span:nth-child(3)::before { content: 'Role'; }
+    .admins-table-row > span:nth-child(4)::before { content: 'Action'; }
+
+    .message-text {
+        text-align: right;
+    }
+}
+
+@media (max-width: 480px) {
+    .messages-row,
+    .admins-table-row {
+        padding: 14px 12px;
+    }
+
+    .messages-row > span,
+    .admins-table-row > span {
+        gap: 8px;
+    }
+
+    .messages-row > span::before,
+    .admins-table-row > span::before {
+        flex-basis: 64px;
+    }
+}
+
+@media (max-width: 900px) {
+    .messages-table,
+    .admins-table {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .messages-table-head,
+    .admins-table-head {
+        display: none;
+    }
+
+    .messages-row,
+    .admins-table-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 16px;
+    }
+
+    .messages-row > span,
+    .admins-table-row > span {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr);
+        align-items: start;
+        gap: 12px;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        line-height: 1.45;
+    }
+
+    .messages-row > span::before,
+    .admins-table-row > span::before {
+        grid-column: 1;
+        color: #9b6a39;
+        content: '';
+        font-size: .68rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .messages-row > span:nth-child(1)::before { content: 'Name'; }
+    .messages-row > span:nth-child(2)::before { content: 'Email'; }
+    .messages-row > span:nth-child(3)::before { content: 'Message'; }
+    .messages-row > span:nth-child(4)::before { content: 'Read'; }
+    .messages-row > span:nth-child(5)::before { content: 'Star'; }
+    .messages-row > span:nth-child(6)::before { content: 'Date'; }
+
+    .admins-table-row > span:nth-child(1)::before { content: 'Name'; }
+    .admins-table-row > span:nth-child(2)::before { content: 'Email'; }
+    .admins-table-row > span:nth-child(3)::before { content: 'Role'; }
+    .admins-table-row > span:nth-child(4)::before { content: 'Action'; }
+
+    .messages-row .message-text {
+        text-align: left;
+    }
+
+    .admins-action-btns {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        min-width: 0;
+        gap: 8px;
+    }
+}
+
 .admins-group-label.admin {
     background: #3a1e08;
     color: #e8c98a;
@@ -316,24 +451,3 @@
     background: #6a1e1e;
 }
 
-@media (max-width: 1100px) {
-
-    .messages-table-head {
-        display: none;
-    }
-
-    .messages-row {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-
-        gap: 12px;
-
-        padding: 22px;
-    }
-
-    .messages-row span {
-        width: 100%;
-    }
-
-}

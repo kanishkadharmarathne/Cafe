@@ -3,12 +3,14 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import './Navbar.css'
 import AuthModal from './AuthModal'
 import { supabase } from '../lib/supabase'
+import { AiOutlineMenuUnfold } from "react-icons/ai";
 
 export default function Navbar() {
   const navigate = useNavigate()
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -56,6 +58,17 @@ export default function Navbar() {
   return (
     <>
       <nav className="navbar">
+        <button
+          type="button"
+          className="nav-menu-toggle"
+          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={menuOpen}
+          aria-controls="site-navigation"
+          onClick={() => setMenuOpen((isOpen) => !isOpen)}
+        >
+          <AiOutlineMenuUnfold aria-hidden="true" />
+        </button>
+
         <div className="nav-logo" onClick={() => navigate('/')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}>
           <div className="logo-circle">
             <span className="logo-icon">☕</span>
@@ -63,22 +76,22 @@ export default function Navbar() {
           <span className="logo-name">Brewed Bliss</span>
         </div>
 
-        <div className="nav-tabs">
-          <NavLink to="/our-cafe" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+        <div id="site-navigation" className={`nav-tabs ${menuOpen ? 'open' : ''}`}>
+          <NavLink to="/our-cafe" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Our Cafe
           </NavLink>
-          <NavLink to="/menu" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+          <NavLink to="/menu" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Menu
           </NavLink>
           {userName && (
-            <NavLink to="/my-orders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            <NavLink to="/my-orders" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               My Orders
             </NavLink>
           )}
-          <NavLink to="/contact" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+          <NavLink to="/contact" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Contact
           </NavLink>
-          <NavLink to="/our-legacy" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+          <NavLink to="/our-legacy" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Our Legacy
           </NavLink>
         </div>

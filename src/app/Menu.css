@@ -256,7 +256,8 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid rgba(201, 168, 124, 0.2);
+  min-width: 0;
+  animation: cartSlideIn 0.3s ease;
   border-top: none;
   border-bottom: none;
   background: rgba(14, 5, 0, 0.9);
@@ -428,6 +429,112 @@
   line-height: 1.4;
   color: #e08a8a;
   text-align: right;
+}
+
+@media (max-width: 900px) {
+  .cart-panel {
+    padding-inline: 24px;
+  }
+
+  .cart-list-item {
+    gap: 12px;
+    padding-inline: 16px;
+  }
+
+  .cart-item-name {
+    min-width: 0;
+  }
+
+  .cart-item-name > span:first-child {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 640px) {
+  .cart-panel {
+    padding-inline: 12px;
+  }
+
+  .cart-panel-header {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .cart-panel-title {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    font-size: 14px;
+  }
+
+  .cart-clear-btn {
+    flex: 0 0 auto;
+    padding-inline: 9px;
+  }
+
+  .cart-list-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name remove'
+      'controls subtotal';
+    align-items: center;
+    gap: 10px 12px;
+    padding: 14px;
+  }
+
+  .cart-item-name {
+    grid-area: name;
+  }
+
+  .cart-item-controls {
+    grid-area: controls;
+    justify-self: start;
+  }
+
+  .cart-item-subtotal {
+    grid-area: subtotal;
+    min-width: 0;
+    text-align: right;
+    font-size: 15px;
+  }
+
+  .cart-remove-btn {
+    grid-area: remove;
+    justify-self: end;
+    padding: 7px;
+  }
+
+  .cart-panel-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .cart-grand-total,
+  .checkout-action,
+  .btn-checkout-full {
+    width: 100%;
+  }
+
+  .cart-grand-total {
+    justify-content: space-between;
+  }
+
+  .checkout-action {
+    align-items: stretch;
+  }
+
+  .btn-checkout-full {
+    padding-inline: 16px;
+  }
+
+  .checkout-message {
+    max-width: none;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* ── Menu item right-side layout ── */
