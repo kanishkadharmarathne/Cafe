@@ -504,8 +504,19 @@
   font-family: var(--font-body);
 }
 
+.admin-layout button,
+.admin-layout input,
+.admin-layout select,
+.admin-layout textarea {
+  font-family: var(--font-body);
+}
+
 .admin-sidebar {
   background: var(--color-primary);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.admin-brand {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -529,13 +540,304 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+.admin-menu-toggle {
+  border-color: rgba(23, 75, 53, 0.25);
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.admin-menu-toggle:hover,
+.admin-menu-toggle:focus-visible {
+  background: #103c2a;
+  color: var(--color-surface);
+}
+
 .admin-back-btn {
   border-color: rgba(255, 255, 255, 0.25);
   color: rgba(255, 255, 255, 0.8);
 }
 
+.admin-nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .admin-main {
   color: var(--color-text);
+}
+
+.dashboard-tab-btn {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.dashboard-tab-btn.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.dashboard-filter-field,
+.dashboard-summary-bar,
+.dashboard-pagination,
+.dashboard-table-footer,
+.admin-section-count,
+.admin-orders-stat-label,
+.admin-order-meta,
+.admin-order-total-label,
+.admin-order-items li,
+.admin-order-field label,
+.admin-toggle-label,
+.admin-group-title,
+.admin-item-portion,
+.admin-item-desc,
+.admin-loading-text {
+  color: var(--color-muted);
+}
+
+.dashboard-filter-field select,
+.dashboard-pagination button,
+.admin-status-btn {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dashboard-pagination button:hover:not(:disabled),
+.admin-status-btn:hover:not(:disabled),
+.admin-status-btn.active {
+  border-color: var(--color-primary);
+  background: rgba(23, 75, 53, 0.08);
+  color: var(--color-primary);
+}
+
+.dashboard-chart-title,
+.admin-form-heading {
+  color: var(--color-primary);
+}
+
+.admin-message,
+.admin-orders-note {
+  border-color: rgba(23, 75, 53, 0.18);
+  background: rgba(23, 75, 53, 0.06);
+  color: var(--color-text);
+}
+
+.admin-table-head {
+  border-color: var(--color-border);
+  background: var(--color-background);
+  color: var(--color-muted);
+}
+
+.admin-table-row,
+.admin-order-items li,
+.admin-orders-note,
+.admin-brand {
+  border-color: var(--color-border);
+}
+
+.admin-table-row:hover {
+  background: rgba(23, 75, 53, 0.04);
+}
+
+.admin-table-row.row-editing {
+  background: rgba(214, 168, 75, 0.12);
+}
+
+.admin-table-row > span {
+  color: var(--color-text);
+}
+
+.admin-table-row > span::before {
+  color: var(--color-muted);
+}
+
+.admin-table-row .admin-item-name,
+.admin-order-total-value,
+.admin-order-kicker {
+  color: var(--color-primary);
+}
+
+.admin-item-price {
+  color: var(--color-primary);
+}
+
+.admin-status-badge.active {
+  border-color: rgba(23, 75, 53, 0.28);
+  background: rgba(23, 75, 53, 0.08);
+  color: var(--color-primary);
+}
+
+.admin-status-badge.inactive {
+  border-color: rgba(176, 67, 55, 0.35);
+  background: #fff5f3;
+  color: #8d3028;
+}
+
+.admin-confirm-text,
+.admin-error {
+  color: #8d3028;
+}
+
+.admin-empty {
+  color: var(--color-muted);
+}
+
+.admin-btn-secondary,
+.admin-btn-secondary-sm,
+.admin-btn-edit {
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+
+.admin-btn-secondary:hover,
+.admin-btn-secondary-sm:hover,
+.admin-btn-edit:hover {
+  border-color: var(--color-primary);
+  background: rgba(23, 75, 53, 0.06);
+  color: var(--color-primary);
+}
+
+.admin-status-btn.active {
+  border-color: var(--color-primary);
+}
+
+.admin-toggle.on {
+  background: var(--color-primary);
+}
+
+.admin-toggle-label {
+  color: var(--color-muted);
+}
+
+.admin-form-group label {
+  color: var(--color-muted);
+}
+
+.admin-form-group input:focus,
+.admin-form-group select:focus,
+.admin-form-group textarea:focus,
+.dashboard-filter-field select:focus {
+  border-color: var(--color-primary);
+}
+
+.messages-page {
+  color: var(--color-text);
+}
+
+.messages-page .empty,
+.admins-group-count,
+.message-date {
+  color: var(--color-muted);
+}
+
+.admins-group-label.super_admin {
+  border-color: rgba(214, 168, 75, 0.4);
+  background: #f5ecd8;
+  color: var(--color-primary);
+}
+
+.messages-table,
+.admins-table {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.messages-table-head,
+.admins-table-head {
+  background: var(--color-background);
+  color: var(--color-muted);
+}
+
+.messages-row,
+.admins-table-row {
+  border-color: var(--color-border);
+}
+
+.messages-row:hover,
+.admins-table-row:hover {
+  background: rgba(23, 75, 53, 0.04);
+}
+
+.messages-row.unread {
+  border-left-color: var(--color-accent);
+  background: rgba(214, 168, 75, 0.08);
+}
+
+.messages-row span,
+.message-text,
+.admins-table-row span {
+  color: var(--color-text);
+}
+
+.messages-row > span::before,
+.admins-table-row > span::before,
+.admins-group-count {
+  color: var(--color-muted);
+}
+
+.read-btn,
+.make-admin-btn {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.read-btn:hover,
+.make-admin-btn:hover:not(:disabled) {
+  background: #103c2a;
+}
+
+.admins-search input {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.admins-search input::placeholder {
+  color: var(--color-muted);
+}
+
+.admins-search input:focus {
+  border-color: var(--color-primary);
+}
+
+.admins-role-badge {
+  border-color: rgba(23, 75, 53, 0.2);
+  background: rgba(23, 75, 53, 0.06);
+  color: var(--color-primary);
+}
+
+.admins-group-label.admin {
+  border-color: rgba(23, 75, 53, 0.2);
+  background: rgba(23, 75, 53, 0.06);
+  color: var(--color-primary);
+}
+
+.admins-group-label.customer {
+  border-color: var(--color-border);
+  background: var(--color-background);
+  color: var(--color-muted);
+}
+
+.make-super-admin-btn {
+  border-color: var(--color-accent);
+  background: #f5ecd8;
+  color: var(--color-primary);
+}
+
+.make-super-admin-btn:hover:not(:disabled) {
+  background: #ede0c2;
+}
+
+.demote-btn {
+  border-color: rgba(176, 67, 55, 0.35);
+  background: #fff5f3;
+  color: #8d3028;
+}
+
+.demote-btn:hover:not(:disabled) {
+  background: #f8e5e2;
 }
 
 .admin-section-title,
@@ -588,6 +890,30 @@
 .admin-btn-primary-catogory:hover,
 .admin-btn-primary-orders:hover {
   background: #103c2a;
+}
+
+.order-history-modal {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.order-history-modal-header {
+  border-color: var(--color-border);
+  background: var(--color-background);
+}
+
+.order-history-modal-header h2,
+.order-history h2,
+.order-header h3 {
+  color: var(--color-primary);
+}
+
+.order-history-close {
+  color: var(--color-muted);
+}
+
+.order-history-close:hover {
+  color: var(--color-primary);
 }
 
 .not-found-link {

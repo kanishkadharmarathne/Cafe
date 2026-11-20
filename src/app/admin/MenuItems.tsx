@@ -280,7 +280,7 @@ export default function MenuItems() {
                       <span>Item</span>
                       <span>Portion</span>
                       <span>Description</span>
-                      <span>Price</span>
+                      <span>Price (RON)</span>
                       <span>Status</span>
                       <span>Actions</span>
                     </div>

@@ -23,7 +23,7 @@ interface OrderItemRow {
 const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>
   new Intl.DateTimeFormat('ro-RO', { month: 'short' }).format(new Date(2026, index, 1))
 )
-const COLORS = ['#e8c98a', '#c8a96a', '#a8894a', '#d4a8f0', '#f0a8a8', '#a8e8c0', '#f0c8a8']
+const COLORS = ['#174b35', '#d6a84b', '#537b61', '#b68b3d', '#85a88c', '#e5c777', '#365943']
 
 function formatOrderTime(value: string) {
   const parsed = new Date(value)
@@ -299,11 +299,11 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={itemChartData} margin={{ top: 8, right: 16, left: 0, bottom: 24 }}>
-                <XAxis dataKey="name" tick={{ fill: '#a08060', fontSize: 12 }} interval={0} />
-                <YAxis tick={{ fill: '#a08060', fontSize: 12 }} allowDecimals={false} width={36} />
+                <XAxis dataKey="name" tick={{ fill: '#77776f', fontSize: 12 }} interval={0} />
+                <YAxis tick={{ fill: '#77776f', fontSize: 12 }} allowDecimals={false} width={36} />
                 <Tooltip
-                  contentStyle={{ background: '#ad603c', border: '1px solid #5a3a1a', color: '#e8c98a', borderRadius: 8 }}
-                  cursor={{ fill: 'rgba(232,201,138,.08)' }}
+                  contentStyle={{ background: '#ffffff', border: '1px solid rgba(41, 43, 39, 0.14)', color: '#292b27', borderRadius: 8 }}
+                  cursor={{ fill: 'rgba(23, 75, 53, 0.08)' }}
                 />
                 <Bar dataKey="quantity" radius={[4, 4, 0, 0]}>
                   {itemChartData.map((entry, index) => (
@@ -331,8 +331,8 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: '#ad603c', border: '1px solid #5a3a1a', color: '#e8c98a', borderRadius: 8 }}
-                  cursor={{ fill: 'rgba(232,201,138,.08)' }}
+                  contentStyle={{ background: '#ffffff', border: '1px solid rgba(41, 43, 39, 0.14)', color: '#292b27', borderRadius: 8 }}
+                  cursor={{ fill: 'rgba(23, 75, 53, 0.08)' }}
                 />
                 <Legend />
               </PieChart>
@@ -422,11 +422,11 @@ export default function Dashboard() {
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 24 }}>
-              <XAxis dataKey="name" tick={{ fill: '#a08060', fontSize: 12 }} interval={0} />
-              <YAxis tick={{ fill: '#a08060', fontSize: 12 }} allowDecimals={false} width={36} />
+              <XAxis dataKey="name" tick={{ fill: '#77776f', fontSize: 12 }} interval={0} />
+              <YAxis tick={{ fill: '#77776f', fontSize: 12 }} allowDecimals={false} width={36} />
               <Tooltip
-                contentStyle={{ background: '#ad603c', border: '1px solid #5a3a1a', color: '#e8c98a', borderRadius: 8 }}
-                cursor={{ fill: 'rgba(232,201,138,.08)' }}
+                contentStyle={{ background: '#ffffff', border: '1px solid rgba(41, 43, 39, 0.14)', color: '#292b27', borderRadius: 8 }}
+                cursor={{ fill: 'rgba(23, 75, 53, 0.08)' }}
               />
               <Bar dataKey="quantity" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => (
