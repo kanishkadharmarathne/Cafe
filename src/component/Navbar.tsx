@@ -69,16 +69,14 @@ export default function Navbar() {
           <AiOutlineMenuUnfold aria-hidden="true" />
         </button>
 
-        <div className="nav-logo" onClick={() => navigate('/')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}>
-          <div className="logo-circle">
-            <span className="logo-icon">☕</span>
-          </div>
-          <span className="logo-name">Brewed Bliss</span>
-        </div>
+        <NavLink to="/" className="nav-logo" aria-label="Taste of Ceylon home">
+          <img className="brand-mark" src="/favicon.svg" alt="" />
+          <span className="logo-name">Taste of Ceylon</span>
+        </NavLink>
 
         <div id="site-navigation" className={`nav-tabs ${menuOpen ? 'open' : ''}`}>
           <NavLink to="/our-cafe" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-            Our Cafe
+            Our Restaurant
           </NavLink>
           <NavLink to="/menu" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Menu
@@ -92,7 +90,7 @@ export default function Navbar() {
             Contact
           </NavLink>
           <NavLink to="/our-legacy" onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-            Our Legacy
+            Our Philosophy
           </NavLink>
         </div>
 

@@ -127,8 +127,8 @@ export default function AdminPanel() {
       {/* ── Sidebar ── */}
       <aside className={`admin-sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="admin-brand">
-          <span className="admin-brand-icon">☕</span>
-          <span className="admin-brand-name">Admin</span>
+        <img className="brand-mark" src="/favicon.svg" alt="" />
+        <span className="admin-brand-name">Taste of Ceylon</span>
         </div>
 
         <nav id="admin-navigation" className="admin-nav">

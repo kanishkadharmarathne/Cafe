@@ -108,8 +108,8 @@ export default function AuthModal({ initialMode, onClose, onSuccess }: AuthModal
 
         {/* Logo */}
         <div className="auth-logo">
-          <span>☕</span>
-          <span className="auth-logo-name">Brewed Bliss</span>
+          <img className="brand-mark" src="/favicon.svg" alt="" />
+          <span className="auth-logo-name">Taste of Ceylon</span>
         </div>
 
         {/* Tab switcher */}
@@ -207,7 +207,7 @@ export default function AuthModal({ initialMode, onClose, onSuccess }: AuthModal
             <div className="auth-success">
               <span>✓</span>
               <h3>Account created!</h3>
-              <p>Welcome to Brewed Bliss. Enjoy your first cup.</p>
+              <p>Welcome to Taste of Ceylon.</p>
               <button className="auth-submit" onClick={handleContinue}>Get Started</button>
             </div>
             )

@@ -3,6 +3,7 @@ import './Pages.css'
 import './Menu.css'
 import CheckoutModal from '../component/CheckoutModal'
 import { supabase } from '../lib/supabase'
+import { formatCurrency } from '../lib/currency'
 
 
 interface MenuItem {
@@ -353,7 +354,7 @@ export default function Menu() {
 
                     <span className="cart-item-unit-price">
 
-                      ₹{item.amount} each
+                      {formatCurrency(item.amount)} each
 
                     </span>
 
@@ -393,7 +394,7 @@ export default function Menu() {
 
                   <span className="cart-item-subtotal">
 
-                    ₹{item.amount * item.qty}
+                    {formatCurrency(item.amount * item.qty)}
 
                   </span>
 
@@ -431,7 +432,7 @@ export default function Menu() {
 
               <span className="cart-total-amount">
 
-                ₹{grandTotal}
+                {formatCurrency(grandTotal)}
 
               </span>
 
@@ -569,7 +570,7 @@ export default function Menu() {
 
                         <span className="menu-price">
 
-                          ₹{menuItem.price}
+                          {formatCurrency(menuItem.price)}
 
                         </span>
                         <div className="menu-item-actions">

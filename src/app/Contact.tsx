@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
 import './Pages.css'
 import { supabase } from '../lib/supabase'
-import { IoCall } from "react-icons/io5";
-import { IoLocationSharp } from "react-icons/io5";
-import { FaClock } from "react-icons/fa";
-import { IoMdMail } from "react-icons/io";
+import { IoLocationSharp } from 'react-icons/io5'
 
 interface Message {
   id: string
@@ -132,51 +129,22 @@ export default function Contact() {
 
         <div className="contact-info">
 
-          <h2>Visit Us</h2>
+          <h2>Find Us</h2>
 
           <div className="contact-detail">
-            <span className="contact-icon"><IoLocationSharp /></span>
+            <span className="contact-icon"><IoLocationSharp aria-hidden="true" /></span>
             <div>
-              <strong>Address</strong>
-              <p>
-                12, Coffee Lane, MG Road
-                <br />
-                Bengaluru, Karnataka 560001
-              </p>
+              <strong>Location</strong>
+              <p>Arad, Romania</p>
+              <a
+                href="https://www.google.com/maps/search/?api=1&query=Arad%2C%20Romania"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Explore Arad on Google Maps
+              </a>
             </div>
           </div>
-
-
-          <div className="contact-detail">
-            <span className="contact-icon"><FaClock /></span>
-            <div>
-              <strong>Hours</strong>
-              <p>
-                Mon – Fri: 7:00 AM – 9:00 PM
-                <br />
-                Sat – Sun: 8:00 AM – 10:00 PM
-              </p>
-            </div>
-          </div>
-
-
-          <div className="contact-detail">
-            <span className="contact-icon"><IoCall /></span>
-            <div>
-              <strong>Phone</strong>
-              <p>+91 98765 43210</p>
-            </div>
-          </div>
-
-
-          <div className="contact-detail">
-            <span className="contact-icon"><IoMdMail /></span>
-            <div>
-              <strong>Email</strong>
-              <p>hello@brewedbliss.in</p>
-            </div>
-          </div>
-
 
         </div>
 
@@ -190,7 +158,7 @@ export default function Contact() {
               <span>☕</span>
               <h3>Thank you!</h3>
               <p>
-                We'll get back to you over a warm cup.
+                Your message has been received.
               </p>
             </div>
 
@@ -288,7 +256,7 @@ export default function Contact() {
           <h4>Customer Feedback</h4>
 
           <p className="feedback-intro">
-            Notes from guests who enjoyed the coffee, food, and atmosphere.
+            Notes from guests who enjoyed the food, service, and atmosphere.
           </p>
         </div>
 

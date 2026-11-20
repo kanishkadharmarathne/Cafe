@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { formatCurrency } from '../../lib/currency'
 import '../Menu.css'
 
 interface MenuItem {
@@ -278,7 +279,7 @@ export default function DiOrders() {
               <li className="cart-list-item" key={item.id}>
                 <div className="cart-item-name">
                   <span>{item.name}</span>
-                  <span className="cart-item-unit-price">Rs {item.amount} each</span>
+                  <span className="cart-item-unit-price">{formatCurrency(item.amount)} each</span>
                 </div>
 
                 <div className="cart-item-controls">
@@ -291,7 +292,7 @@ export default function DiOrders() {
                   </button>
                 </div>
 
-                <span className="cart-item-subtotal">Rs {item.amount * item.qty}</span>
+                <span className="cart-item-subtotal">{formatCurrency(item.amount * item.qty)}</span>
 
                 <button className="cart-remove-btn" onClick={() => removeItem(item.id)}>
                   x
@@ -303,7 +304,7 @@ export default function DiOrders() {
           <div className="cart-panel-footer">
             <div className="cart-grand-total">
               <span>Total</span>
-              <span className="cart-total-amount">Rs {grandTotal}</span>
+              <span className="cart-total-amount">{formatCurrency(grandTotal)}</span>
             </div>
 
             <div className="checkout-action">
@@ -344,7 +345,7 @@ export default function DiOrders() {
                   </div>
 
                   <div className="menu-item-right">
-                    <span className="menu-price">Rs {menuItem.price}</span>
+                    <span className="menu-price">{formatCurrency(menuItem.price)}</span>
                     <div className="menu-item-actions">
                       <button
                         className={`menu-btn-cart ${added[menuItem.id] ? 'added' : ''}`}

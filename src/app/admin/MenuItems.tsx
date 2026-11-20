@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { formatCurrency } from '../../lib/currency'
 import ItemModal from './ItemModal'
 import './AdminPanel.css'
 
@@ -302,7 +303,7 @@ export default function MenuItems() {
                         </span>
 
                         <span>
-                          <span className="admin-item-value">₹{menuItem.price}</span>
+                          <span className="admin-item-value">{formatCurrency(menuItem.price)}</span>
                         </span>
 
                         <span>

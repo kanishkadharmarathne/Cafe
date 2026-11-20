@@ -138,7 +138,7 @@ export default function ItemModal({
           </div>
 
           <div className="admin-form-group">
-            <label>Price *</label>
+            <label>Price (RON) *</label>
             <input
               type="number"
               min="1"

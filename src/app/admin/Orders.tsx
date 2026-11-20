@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { formatCurrency } from '../../lib/currency'
 import './AdminPanel.css'
 
 type PaymentStatus = 'Pending' | 'Paid'
@@ -42,10 +43,6 @@ function getProcessingStatus(order: Order): ProcessingStatus {
 
 function getDeliveryStatus(order: Order): DeliveryStatus {
   return order.delivery_status ? 'Delivered' : 'Pending'
-}
-
-function formatAmount(value: number | string) {
-  return `₹${Number(value).toFixed(2)}`
 }
 
 export default function Orders() {
@@ -186,14 +183,14 @@ export default function Orders() {
                   <div className="admin-order-meta">
                     <span>{order.phone}</span>
                     <span>{order.order_type}</span>
-                    <span>{new Date(order.order_time).toLocaleString()}</span>
+                    <span>{new Date(order.order_time).toLocaleString('ro-RO')}</span>
                   </div>
                 </div>
 
                 <div className="admin-order-total-block">
                   <span className="admin-order-total-label">Total</span>
                   <strong className="admin-order-total-value">
-                    {formatAmount(order.total_value)}
+                    {formatCurrency(order.total_value)}
                   </strong>
                 </div>
               </div>

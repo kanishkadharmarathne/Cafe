@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './Pages.css'
 import './Menu.css'
 import { supabase } from '../lib/supabase'
+import { formatCurrency } from '../lib/currency'
 
 interface OrderItem {
     id: number
@@ -136,7 +137,7 @@ export default function MyOrders() {
                         <div className="order-card" key={order.order_id}>
                             <div className="order-header">
                                 <h3>Order #{order.order_id}</h3>
-                                <span>{new Date(order.order_time).toLocaleString()}</span>
+                                <span>{new Date(order.order_time).toLocaleString('ro-RO')}</span>
                             </div>
 
                             <div className="order-status-row">
@@ -152,7 +153,7 @@ export default function MyOrders() {
                             </div>
 
                             <p>Type: {order.order_type}</p>
-                            <p>Total: ₹{order.total_value}</p>
+                            <p>Total: {formatCurrency(order.total_value)}</p>
 
                             <h4>Items</h4>
                             <ul>

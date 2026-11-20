@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { formatCurrency } from '../../lib/currency'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import './AdminPanel.css'
 
@@ -19,12 +20,10 @@ interface OrderItemRow {
 }
 
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>
+  new Intl.DateTimeFormat('ro-RO', { month: 'short' }).format(new Date(2026, index, 1))
+)
 const COLORS = ['#e8c98a', '#c8a96a', '#a8894a', '#d4a8f0', '#f0a8a8', '#a8e8c0', '#f0c8a8']
-
-function formatCurrency(value: number | string) {
-  return `₹${Number(value).toFixed(2)}`
-}
 
 function formatOrderTime(value: string) {
   const parsed = new Date(value)
@@ -32,7 +31,7 @@ function formatOrderTime(value: string) {
     return value
   }
 
-  return parsed.toLocaleString()
+  return parsed.toLocaleString('ro-RO')
 }
 
 function getOrderYear(value: string) {

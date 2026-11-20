@@ -1,75 +1,55 @@
-# React + TypeScript + Vite
+# Taste of Ceylon
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The existing React application is the starting point for Taste of Ceylon, a Sri Lankan-inspired restaurant in Arad, Romania. Menu and order amounts are displayed in Romanian lei (RON) using Romanian locale formatting; existing numeric values are not converted.
 
-Currently, two official plugins are available:
+## Application structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+public/
+  favicon.svg                 Brand mark used by the browser and app shell
+src/
+  App.tsx                     Route table, public layout, and not-found page
+  app/                        Customer pages and admin feature modules
+    admin/                    Role-gated dashboard, menus, messages, and orders
+  component/                  Shared navigation, footer, auth, and checkout UI
+  lib/
+    currency.ts               Shared ro-RO / RON formatter
+    supabase.ts               Supabase browser client
+  index.css                   Base styles and design tokens
+  brand.css                   Shared restaurant theme across customer/admin UI
+  main.tsx                    Vite/React entry point
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Routes
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Route | Purpose |
+| --- | --- |
+| `/` | Restaurant landing page |
+| `/our-cafe` | Restaurant concept and values |
+| `/menu` | Active menu, cart, and existing checkout flow |
+| `/my-orders` | Signed-in customer's order history |
+| `/contact` | Contact form and Arad location reference |
+| `/our-legacy` | Restaurant philosophy (kept for existing links) |
+| `/admin` | Role-gated administration workspace |
+| Any other path | Branded not-found page |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The public shell shares the navbar and footer. Admin workspace sections are selected inside the admin page and remain protected by the existing Supabase profile-role checks.
 
-```
+## Integrations and configuration
+
+The browser Supabase client in `src/lib/supabase.ts` reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the local environment. Configure these values in an ignored local `.env` file; never commit credentials. Customer authentication, menu retrieval, contact messages, order history, checkout persistence, and administration continue to use the existing Supabase integration. This phase does not change database schemas or production data.
+
+Restaurant street address, phone, email, and opening hours have not been supplied, so they are intentionally not displayed. The map link points to the general Arad, Romania search area rather than implying an exact restaurant pin.
+
+## Design and currency
+
+Shared CSS tokens define the forest-green, warm-gold, cream, white, charcoal, and muted-gray palette, typography, spacing constraints, radii, and focus treatment. `formatCurrency` is the single UI formatter for RON amounts and uses `ro-RO` with two decimal places. Stored amounts are presented as-is; no exchange-rate conversion is performed.
+
+## Development
+
+- `npm run dev` — start the Vite development server
+- `npm run build` — run TypeScript project checks and create a production build
+- `npm run lint` — run ESLint
+- `npm run preview` — preview the production build
+
+There is no standalone test script in the current project.

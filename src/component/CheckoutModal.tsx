@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import './CheckoutModal.css'
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'
+import { formatCurrency } from '../lib/currency'
 
 interface CartEntry { id: string; name: string; qty: number; amount: number }
 
@@ -10,13 +11,6 @@ interface CheckoutModalProps {
   grandTotal: number
   onClose: () => void
   onSuccess: () => void
-}
-
-interface CartEntry {
-  id: string;
-  name: string;
-  qty: number;
-  amount: number;
 }
 
 type Step = 'details' | 'payment' | 'confirm'
@@ -303,12 +297,12 @@ async function handlePaySubmit(e: React.FormEvent) {
                   <li key={item.name} className="co-order-item">
                     <span></span>
                     <span>{item.name} <em>×{item.qty}</em></span>
-                    <span>₹{item.amount * item.qty}</span>
+                    <span>{formatCurrency(item.amount * item.qty)}</span>
                   </li>
                 ))}
               </ul>
               <div className="co-order-total">
-                <span>Total</span><span>₹{grandTotal}</span>
+                <span>Total</span><span>{formatCurrency(grandTotal)}</span>
               </div>
             </div>
 
@@ -416,7 +410,7 @@ async function handlePaySubmit(e: React.FormEvent) {
           <div className="co-body">
             <div className="co-pay-total-bar">
               <span>Amount to pay</span>
-              <span className="co-pay-amount">₹{grandTotal}</span>
+              <span className="co-pay-amount">{formatCurrency(grandTotal)}</span>
             </div>
 
             <form className="co-form" onSubmit={handlePaySubmit} noValidate>
@@ -524,7 +518,7 @@ async function handlePaySubmit(e: React.FormEvent) {
               <div className="co-btn-row">
                 <button type="button" className="co-back" onClick={() => setStep('details')}>← Back</button>
                 <button type="submit" className="co-submit" disabled={processing} >
-                  {processing ? <span className="co-spinner" /> : `Pay ₹${grandTotal}`} 
+                  {processing ? <span className="co-spinner" /> : `Pay ${formatCurrency(grandTotal)}`}
                 </button>
               </div>
             </form>
@@ -545,11 +539,11 @@ async function handlePaySubmit(e: React.FormEvent) {
               {cart.map((item) => (
                 <div key={item.name} className="co-confirm-item">
                   <span>{item.name} ×{item.qty}</span>
-                  <span>₹{item.amount * item.qty}</span>
+                  <span>{formatCurrency(item.amount * item.qty)}</span>
                 </div>
               ))}
               <div className="co-confirm-total">
-                <span>Total Paid</span><span>₹{grandTotal}</span>
+                <span>Total Paid</span><span>{formatCurrency(grandTotal)}</span>
               </div>
             </div>
             <p className="co-confirm-note">
