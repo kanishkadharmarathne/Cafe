@@ -18,8 +18,9 @@ export default function OurCafe() {
             hospitality associated with the island.
           </p>
           <p>
-            This page shares the ideas behind the restaurant. Menu, address,
-            contact, and opening-hour details will be added when confirmed.
+            This page shares the ideas behind the restaurant. Find our location
+            and contact details on the Contact page; opening hours will be added
+            when confirmed.
           </p>
         </div>
         <div className="highlight-card">

@@ -272,17 +272,18 @@ export default function Menu() {
       <div className="page-header">
 
         <span className="page-eyebrow">
-          What We Serve
+          Menu
         </span>
 
         <h1>
-          Menu
+          The flavours of Ceylon
         </h1>
 
         <div className="divider"/>
 
         <p className="page-desc">
-          Seasonal, honest, and made with care.
+          A place at our table: fragrant spices, wok favourites and Sri Lankan
+          recipes, shared with passion in Arad.
         </p>
 
       </div>

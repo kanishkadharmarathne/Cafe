@@ -33,6 +33,13 @@
   line-height: 0;
 }
 
+.map-wrapper iframe {
+  display: block;
+  width: 100%;
+  height: 240px;
+  border: 0;
+}
+
 .footer-address {
   margin: 10px 0 0;
   font-size: 13px;

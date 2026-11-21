@@ -137,14 +137,22 @@ export default function Contact() {
               <strong>Location</strong>
               <p>Arad, Romania</p>
               <a
-                href="https://www.google.com/maps/search/?api=1&query=Arad%2C%20Romania"
+                href="https://www.google.com/maps/search/?api=1&query=46.193694%2C21.308167"
                 target="_blank"
                 rel="noreferrer"
               >
-                Explore Arad on Google Maps
+                Get directions on Google Maps
               </a>
             </div>
           </div>
+
+          <iframe
+            className="contact-map"
+            title="Taste of Ceylon location on Google Maps"
+            src="https://maps.google.com/maps?q=46.193694%2C21.308167&z=17&output=embed"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
 
         </div>
 

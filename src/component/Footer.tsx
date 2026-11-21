@@ -7,14 +7,22 @@ export default function Footer() {
       <div className="footer-inner">
         <div className="footer-map">
           <h3 className="footer-section-title">Taste of Ceylon</h3>
+          <div className="map-wrapper">
+            <iframe
+              title="Taste of Ceylon location on Google Maps"
+              src="https://maps.google.com/maps?q=46.193694%2C21.308167&z=17&output=embed"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
           <p className="footer-address">Sri Lankan-inspired dining in Arad, Romania.</p>
           <a
             className="footer-location-link"
-            href="https://www.google.com/maps/search/?api=1&query=Arad%2C%20Romania"
+            href="https://www.google.com/maps/search/?api=1&query=46.193694%2C21.308167"
             target="_blank"
             rel="noreferrer"
           >
-            Explore Arad on Google Maps
+            Get directions on Google Maps
           </a>
         </div>
 
