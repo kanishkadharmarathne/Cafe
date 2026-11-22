@@ -1,632 +1,225 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './Pages.css'
 import './Menu.css'
 import CheckoutModal from '../component/CheckoutModal'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/currency'
+import { localized, useLanguage } from '../lib/language'
+import { fetchPublicMenu, type Category, type MenuItem } from '../lib/menu'
 
-
-interface MenuItem {
-  id: string
-  category_id: string | null
-  item: string
-  portion: string
-  description: string
-  price: number
+function ProductImage({ url, name }: { url: string | null; name: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const { t } = useLanguage()
+  if (!url || failedUrl === url) {
+    return <div className="product-image-placeholder">{t('Image unavailable', 'Imagine indisponibilă')}</div>
+  }
+  return <img className="product-image" src={url} alt={name} loading="lazy" onError={() => setFailedUrl(url)} />
 }
 
-interface Category {
-  id: string
-  category_name: string
+function CategoryImage({ url, name }: { url: string | null; name: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  if (!url || failedUrl === url) return null
+  return <img className="category-image" src={url} alt={name} loading="lazy" onError={() => setFailedUrl(url)} />
 }
-
-
-interface CartEntry {
-  id: string
-  name: string
-  qty: number
-  amount: number
-}
-
-
 
 export default function Menu() {
-
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const { language, t } = useLanguage()
+  const [items, setItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [menuLoading, setMenuLoading] = useState(true)
-
-  const [cart, setCart] = useState<CartEntry[]>([])
-
-  const [added, setAdded] = useState<Record<string, boolean>>({})
-
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [search, setSearch] = useState('')
+  const [categoryId, setCategoryId] = useState('all')
+  const [selected, setSelected] = useState<MenuItem | null>(null)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [showCheckout, setShowCheckout] = useState(false)
-  const [checkoutMessage, setCheckoutMessage] = useState('')
+  const [checkoutError, setCheckoutError] = useState(false)
+  const [reload, setReload] = useState(0)
+  const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    async function fetchMenu(){
-      setMenuLoading(true)
-
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('id, category_name')
-        .order('category_name')
-
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select(`
-          id,
-          category_id,
-          item,
-          portion,
-          description,
-          price
-        `)
-        .eq('status', true)
-        .order('item')
-
-
-      if (!categoriesError && categoriesData) {
-        setCategories(categoriesData)
-      } else if (categoriesError) {
-        console.error('Failed to fetch categories:', categoriesError)
+    let active = true
+    fetchPublicMenu().then(({ categories, items }) => {
+      if (!active) return
+      setCategories(categories)
+      setItems(items)
+      setError(false)
+      setLoading(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to load menu:', err)
+      if (active) {
+        setError(true)
+        setLoading(false)
       }
-
-
-      if (!error && data) {
-        setMenuItems(data)
-      } else if (error) {
-        console.error('Failed to fetch menu items:', error)
-      }
-
-      setMenuLoading(false)
-
-    }
-
-
-    fetchMenu()
-
-  },[])
-
-
-
-  const categoryNameById = new Map(
-    categories.map((category) => [category.id, category.category_name])
-  )
-
-  const groupedMenu = Array.from(
-    menuItems.reduce((groups, item) => {
-      const categoryKey = item.category_id || 'uncategorized'
-      const categoryName = item.category_id
-        ? categoryNameById.get(item.category_id) || 'Uncategorized'
-        : 'Uncategorized'
-
-      if (!groups.has(categoryKey)) {
-        groups.set(categoryKey, {
-          key: categoryKey,
-          name: categoryName,
-          items: [] as MenuItem[],
-        })
-      }
-
-      groups.get(categoryKey)?.items.push(item)
-      return groups
-    }, new Map<string, { key: string; name: string; items: MenuItem[] }>() ).values()
-  )
-
-  function handleAddToCart(menuItem:MenuItem){
-
-
-    setCart((prev)=>{
-
-      const existing = prev.find(
-        item=>item.id === menuItem.id
-      )
-
-
-      if(existing){
-
-        return prev.map(item=>
-
-          item.id === menuItem.id
-
-          ? {
-              ...item,
-              qty:item.qty+1
-            }
-
-          : item
-
-        )
-
-      }
-
-
-
-      return [
-
-        ...prev,
-
-        {
-          id:menuItem.id,
-          name:menuItem.item,
-          qty:1,
-          amount:menuItem.price
-        }
-
-      ]
-
-
     })
+    return () => { active = false }
+  }, [reload])
 
+  useEffect(() => {
+    if (!selected) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    modalRef.current?.querySelector<HTMLButtonElement>('.product-modal-close')?.focus()
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setSelected(null)
+      if (event.key === 'Tab' && modalRef.current) {
+        const buttons = Array.from(modalRef.current.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+        if (!buttons.length) return
+        if (event.shiftKey && document.activeElement === buttons[0]) {
+          event.preventDefault()
+          buttons[buttons.length - 1].focus()
+        } else if (!event.shiftKey && document.activeElement === buttons[buttons.length - 1]) {
+          event.preventDefault()
+          buttons[0].focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previousFocus?.focus()
+    }
+  }, [selected])
 
-    setAdded(prev=>({
-      ...prev,
-      [menuItem.id]:true
-    }))
+  const nameOf = (item: MenuItem) => localized(language, item.item_name_en, item.item_name_ro) || t('Unnamed item', 'Produs fără nume')
+  const visibleItems = items.filter(item => !item.category_id || categories.some(category => category.id === item.category_id))
+  const matchingItems = visibleItems.filter(item => {
+    const text = `${nameOf(item)} ${localized(language, item.description_en, item.description_ro)} ${localized(language, item.ingredients_en, item.ingredients_ro)}`.toLocaleLowerCase()
+    return (categoryId === 'all' || item.category_id === categoryId) && text.includes(search.trim().toLocaleLowerCase())
+  })
+  const cart = visibleItems.filter(item => quantities[item.id] > 0).map(item => ({
+    id: item.id, name: nameOf(item), qty: quantities[item.id], amount: Number(item.price),
+  }))
+  const totalItems = cart.reduce((sum, item) => sum + item.qty, 0)
+  const grandTotal = cart.reduce((sum, item) => sum + item.qty * item.amount, 0)
 
-
-    setTimeout(()=>{
-
-      setAdded(prev=>({
-        ...prev,
-        [menuItem.id]:false
-      }))
-
-    },1200)
-
-
+  function changeQuantity(item: MenuItem, change: number) {
+    if (change > 0 && !item.is_available) return
+    setQuantities(previous => {
+      const quantity = Math.max(0, (previous[item.id] || 0) + change)
+      return { ...previous, [item.id]: quantity }
+    })
   }
 
-  function increment(id:string){
-
-    setCart(prev=>
-
-      prev.map(item=>
-
-        item.id === id
-
-        ? {
-            ...item,
-            qty:item.qty+1
-          }
-
-        : item
-
-      )
-
-    )
-
-  }
-
-  function decrement(id:string){
-
-    setCart(prev=>
-
-      prev
-      .map(item=>
-
-        item.id === id
-
-        ? {
-            ...item,
-            qty:item.qty-1
-          }
-
-        : item
-
-      )
-      .filter(item=>item.qty>0)
-
-    )
-
-  }
-
-  function removeItem(id:string){
-
-    setCart(prev=>
-
-      prev.filter(item=>item.id!==id)
-
-    )
-
-  }
-
-  async function handleCheckoutClick() {
-    const {
-      data: { user },
-      error
-    } = await supabase.auth.getUser()
-
+  async function handleCheckout() {
+    const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) {
-      setCheckoutMessage('Please sign in or log in before placing an order.')
+      if (error) console.error('Failed to check sign-in:', error)
+      setCheckoutError(true)
       return
     }
-
-    setCheckoutMessage('')
+    setCheckoutError(false)
     setShowCheckout(true)
   }
 
+  function productCard(item: MenuItem) {
+    const name = nameOf(item)
+    return (
+      <article className="product-card" key={item.id}>
+        <button className="product-detail-button" type="button" onClick={() => setSelected(item)} aria-label={`${t('View details', 'Vezi detalii')}: ${name}`}>
+          <ProductImage url={item.image_url} name={name} />
+          <span className="product-card-body">
+            <strong>{name}</strong>
+            {item.is_featured && <span className="product-featured">{t('Featured', 'Recomandat')}</span>}
+            {item.portion && <span className="menu-item-portion">{item.portion}</span>}
+            <span>{localized(language, item.description_en, item.description_ro)}</span>
+          </span>
+        </button>
+        <div className="product-card-actions">
+          <strong>{formatCurrency(item.price)}</strong>
+          <button className="menu-btn-cart" type="button" disabled={!item.is_available} onClick={() => changeQuantity(item, 1)}>
+            {item.is_available ? t('+ Cart', '+ Coș') : t('Unavailable', 'Indisponibil')}
+          </button>
+        </div>
+      </article>
+    )
+  }
 
-
-
-
-  const totalItems = cart.reduce(
-    (sum,item)=>sum+item.qty,
-    0
-  )
-
-  const grandTotal = cart.reduce(
-    (sum,item)=>
-      sum+(item.amount*item.qty),
-    0
-  )
-
+  const featured = matchingItems.filter(item => item.is_featured)
   return (
-
     <>
-
-    <main className="page inner-page">
-
-
-      <div className="page-header">
-
-        <span className="page-eyebrow">
-          Menu
-        </span>
-
-        <h1>
-          The flavours of Ceylon
-        </h1>
-
-        <div className="divider"/>
-
-        <p className="page-desc">
-          A place at our table: fragrant spices, wok favourites and Sri Lankan
-          recipes, shared with passion in Arad.
-        </p>
-
-      </div>
-      {
-        cart.length > 0 &&
-
-        <div className="cart-panel">
-
-
-          <div className="cart-panel-header">
-
-            <span className="cart-panel-title">
-
-              🛒 Your Order
-
-              <span className="cart-total-badge">
-
-                {totalItems} item
-                {totalItems>1?'s':''}
-
-              </span>
-
-            </span>
-
-
-
-            <button
-
-              className="cart-clear-btn"
-
-              onClick={()=>setCart([])}
-
-            >
-
-              Clear all
-
-            </button>
-
-
-          </div>
-
-
-
-
-
-
-          <ul className="cart-list">
-
-
-            {
-              cart.map(item=>(
-
-
-                <li
-
-                  className="cart-list-item"
-
-                  key={item.id}
-
-                >
-
-
-                  <div className="cart-item-name">
-
-                    <span>
-                      {item.name}
-                    </span>
-
-
-                    <span className="cart-item-unit-price">
-
-                      {formatCurrency(item.amount)} each
-
-                    </span>
-
-
-                  </div>
-
-
-
-
-                  <div className="cart-item-controls">
-
-
-                    <button className="cart-qty-btn" onClick={() => decrement(item.id)}>
-                      -
-                    </button>
-
-
-
-                    <span className="cart-qty">
-
-                      {item.qty}
-
-                    </span>
-
-
-
-
-                    <button className="cart-qty-btn" onClick={() => increment(item.id)}>
-                      +
-                    </button>
-
-
-                  </div>
-
-
-
-
-                  <span className="cart-item-subtotal">
-
-                    {formatCurrency(item.amount * item.qty)}
-
-                  </span>
-
-
-
-
-                 <button className="cart-remove-btn" onClick={() => removeItem(item.id)}>
-                    ✕
-                  </button>
-
-
-
-                </li>
-
-
-              ))
-            }
-
-
-          </ul>
-
-
-
-
-
-          <div className="cart-panel-footer">
-
-
-            <div className="cart-grand-total">
-
-              <span>
-                Total
-              </span>
-
-
-              <span className="cart-total-amount">
-
-                {formatCurrency(grandTotal)}
-
-              </span>
-
-
-            </div>
-
-
-
-
-            <div className="checkout-action">
-              <button className="btn-checkout-full" onClick={handleCheckoutClick}>
-                Proceed to Checkout →
-              </button>
-
-              {checkoutMessage && (
-                <p className="checkout-message">
-                  {checkoutMessage}
-                </p>
-              )}
-            </div>
-
-
-
-          </div>
-
-
+      <main className="page inner-page" lang={language}>
+        <div className="page-header">
+          <span className="page-eyebrow">{t('Menu', 'Meniu')}</span>
+          <h1>{t('The flavours of Ceylon', 'Aromele Ceylonului')}</h1>
+          <div className="divider" />
+          <p className="page-desc">{t('A place at our table: fragrant spices, wok favourites and Sri Lankan recipes, shared with passion in Arad.', 'Un loc la masa noastră: condimente aromate, preparate la wok și rețete din Sri Lanka, împărtășite cu pasiune în Arad.')}</p>
         </div>
 
-      }
-
-
-
-
-
-
-      {
-        menuLoading
-
-        ?
-
-        <p style={{
-          textAlign:'center',
-          color:'#7a5c3e',
-          padding:'60px 0'
-        }}>
-
-          Loading menu...
-
-        </p>
-
-
-        :
-
-        groupedMenu.map((group) => {
-
-
-          const items = group.items
-
-
-
-          return (
-
-            <section
-
-              className="menu-section"
-
-              key={group.key}
-
-            >
-
-
-              <h2 className="menu-category">
-                {group.name}
-
-              </h2>
-
-
-
-
-              <div className="menu-grid">
-
-
-                {
-                  items.map(menuItem=>(
-
-
-                    <div
-
-                      className="menu-item"
-
-                      key={menuItem.id}
-
-                    >
-
-
-
-                      <div className="menu-item-info">
-
-
-                        <h3>
-                          {menuItem.item}
-                        </h3>
-
-
-
-                        {
-                          menuItem.portion &&
-
-                          <span className="menu-item-portion">
-
-                            {menuItem.portion}
-
-                          </span>
-
-                        }
-
-
-
-
-                        <p>
-
-                          {menuItem.description}
-
-                        </p>
-
-
-                      </div>
-
-
-
-
-
-                      <div className="menu-item-right">
-
-
-                        <span className="menu-price">
-
-                          {formatCurrency(menuItem.price)}
-
-                        </span>
-                        <div className="menu-item-actions">
-                          <button
-                            className={`menu-btn-cart ${added[menuItem.id] ? 'added' : ''}`}
-                            onClick={() => handleAddToCart(menuItem)}
-                          >
-                            {added[menuItem.id] ? '✓ Added' : '+ Cart'}
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
-
-
-                  ))
-                }
+        {cart.length > 0 && (
+          <section className="cart-panel" aria-label={t('Your order', 'Comanda ta')}>
+            <div className="cart-panel-header">
+              <span className="cart-panel-title">{t('Your order', 'Comanda ta')} <span className="cart-total-badge">{totalItems}</span></span>
+              <button className="cart-clear-btn" onClick={() => setQuantities({})}>{t('Clear all', 'Golește coșul')}</button>
+            </div>
+            <ul className="cart-list">
+              {cart.map(entry => {
+                const item = visibleItems.find(product => product.id === entry.id)!
+                return <li className="cart-list-item" key={entry.id}>
+                  <div className="cart-item-name"><span>{entry.name}</span><span className="cart-item-unit-price">{formatCurrency(entry.amount)} / {t('item', 'bucată')}</span></div>
+                  <div className="cart-item-controls">
+                    <button className="cart-qty-btn" aria-label={`${t('Decrease quantity', 'Scade cantitatea')}: ${entry.name}`} onClick={() => changeQuantity(item, -1)}>−</button>
+                    <span className="cart-qty">{entry.qty}</span>
+                    <button className="cart-qty-btn" aria-label={`${t('Increase quantity', 'Crește cantitatea')}: ${entry.name}`} disabled={!item.is_available} onClick={() => changeQuantity(item, 1)}>+</button>
+                  </div>
+                  <span className="cart-item-subtotal">{formatCurrency(entry.amount * entry.qty)}</span>
+                  <button className="cart-remove-btn" aria-label={`${t('Remove', 'Elimină')}: ${entry.name}`} onClick={() => setQuantities(previous => ({ ...previous, [entry.id]: 0 }))}>✕</button>
+                </li>
+              })}
+            </ul>
+            <div className="cart-panel-footer">
+              <div className="cart-grand-total"><span>Total</span><span className="cart-total-amount">{formatCurrency(grandTotal)}</span></div>
+              <div className="checkout-action">
+                <button className="btn-checkout-full" onClick={handleCheckout}>{t('Proceed to checkout', 'Finalizează comanda')} →</button>
+                {checkoutError && <p className="checkout-message" role="alert">{t('Please sign in before placing an order.', 'Autentifică-te înainte de a plasa o comandă.')}</p>}
               </div>
-            </section>
-          )
+            </div>
+          </section>
+        )}
 
-        })
-      }
-    </main>
-    {
-      showCheckout &&
-
-
-      <CheckoutModal
-
-
-        cart={cart}
-
-
-        grandTotal={grandTotal}
-
-
-        onClose={()=>
-          setShowCheckout(false)
-        }
-
-
-        onSuccess={() => {
-          setCart([])
-        }}
-
-
-      />
-
-    }
-
-
-
+        {loading ? (
+          <div className="menu-skeleton" role="status">{t('Loading menu...', 'Se încarcă meniul...')}<div /><div /><div /></div>
+        ) : error ? (
+          <div className="menu-message" role="alert"><p>{t('Could not load the menu.', 'Meniul nu a putut fi încărcat.')}</p><button className="btn-outline" onClick={() => { setLoading(true); setReload(value => value + 1) }}>{t('Try again', 'Încearcă din nou')}</button></div>
+        ) : (
+          <>
+            <div className="menu-filters">
+              <label htmlFor="menu-search">{t('Search menu', 'Caută în meniu')}</label>
+              <input id="menu-search" type="search" value={search} onChange={event => setSearch(event.target.value)} />
+              <label htmlFor="menu-category-filter">{t('Category', 'Categorie')}</label>
+              <select id="menu-category-filter" value={categoryId} onChange={event => setCategoryId(event.target.value)}>
+                <option value="all">{t('All categories', 'Toate categoriile')}</option>
+                {categories.map(category => <option key={category.id} value={category.id}>{localized(language, category.category_name_en, category.category_name_ro)}</option>)}
+              </select>
+            </div>
+            {featured.length > 0 && <section className="menu-section"><h2 className="menu-category">{t('Featured', 'Recomandări')}</h2><div className="product-grid">{featured.map(productCard)}</div></section>}
+            {matchingItems.length === 0 && (search.trim() || categories.length === 0) && <p className="menu-message">{t('No products found.', 'Nu am găsit produse.')}</p>}
+                {categories.map(category => {
+                  const categoryItems = matchingItems.filter(item => item.category_id === category.id)
+                  if (categoryId !== 'all' && categoryId !== category.id) return null
+                  if (!categoryItems.length && search.trim()) return null
+                  return <section className="menu-section" key={category.id}>
+                    <h2 className="menu-category">{localized(language, category.category_name_en, category.category_name_ro)}</h2>
+                    <CategoryImage url={category.image_url} name={localized(language, category.category_name_en, category.category_name_ro)} />
+                    <p>{localized(language, category.description_en, category.description_ro)}</p>
+                    {categoryItems.length ? <div className="product-grid">{categoryItems.map(productCard)}</div> : <p>{t('No products in this category.', 'Nu există produse în această categorie.')}</p>}
+                  </section>
+                })}
+                {matchingItems.some(item => !item.category_id) && <section className="menu-section"><h2 className="menu-category">{t('Other', 'Altele')}</h2><div className="product-grid">{matchingItems.filter(item => !item.category_id).map(productCard)}</div></section>}
+          </>
+        )}
+      </main>
+      {selected && <div className="product-modal-overlay" onClick={event => { if (event.target === event.currentTarget) setSelected(null) }}>
+        <div className="product-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="product-title">
+          <button className="product-modal-close" onClick={() => setSelected(null)} aria-label={t('Close', 'Închide')}>✕</button>
+          <ProductImage url={selected.image_url} name={nameOf(selected)} />
+          <h2 id="product-title">{nameOf(selected)}</h2>
+          <p>{localized(language, selected.description_en, selected.description_ro)}</p>
+          {localized(language, selected.ingredients_en, selected.ingredients_ro) && <p><strong>{t('Ingredients', 'Ingrediente')}:</strong> {localized(language, selected.ingredients_en, selected.ingredients_ro)}</p>}
+          {selected.portion && <p><strong>{t('Portion', 'Porție')}:</strong> {selected.portion}</p>}
+          <div className="product-card-actions"><strong>{formatCurrency(selected.price)}</strong><button className="menu-btn-cart" disabled={!selected.is_available} onClick={() => changeQuantity(selected, 1)}>{selected.is_available ? t('+ Cart', '+ Coș') : t('Unavailable', 'Indisponibil')}</button></div>
+        </div>
+      </div>}
+      {showCheckout && <CheckoutModal cart={cart} grandTotal={grandTotal} onClose={() => setShowCheckout(false)} onSuccess={() => setQuantities({})} />}
     </>
-
   )
-
 }

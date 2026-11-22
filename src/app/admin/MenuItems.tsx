@@ -1,449 +1,161 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
-import ItemModal from './ItemModal'
+import { fetchAdminMenu, uploadMenuImage, type Category, type MenuItem } from '../../lib/menu'
+import ItemModal, { type MenuItemInput } from './ItemModal'
 import './AdminPanel.css'
 
-interface MenuItem {
-  id: string
-  category_id: string | null
-  item: string
-  portion: string
-  description: string
-  price: number
-  status: boolean
-  created_at: string
-  categories?: {
-    id: string
-    category_name: string
-  } | {
-    id: string
-    category_name: string
-  }[] | null
-}
+type CategoryInput = Omit<Category, 'id'>
 
-interface Category {
-  id: string
-  category_name: string
+function CategoryModal({ initial, onClose, onSave }: { initial: Category | null; onClose: () => void; onSave: (category: CategoryInput) => Promise<void> }) {
+  const [form, setForm] = useState<CategoryInput>(() => ({
+    category_name_en: initial?.category_name_en || '',
+    category_name_ro: initial?.category_name_ro || '',
+    description_en: initial?.description_en || '',
+    description_ro: initial?.description_ro || '',
+    image_url: initial?.image_url || '',
+    display_order: initial?.display_order ?? 0,
+    is_active: initial?.is_active ?? true,
+  }))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!form.category_name_en?.trim() && !form.category_name_ro?.trim()) {
+      setError('Enter at least one category name.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      let imageUrl = form.image_url
+      if (file) {
+        imageUrl = await uploadMenuImage(file)
+        setForm(previous => ({ ...previous, image_url: imageUrl }))
+        setFile(null)
+      }
+      await onSave({ ...form, image_url: imageUrl })
+    } catch (err) {
+      console.error('Failed to save category:', err)
+      setError('Could not save category. Check permissions and try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <div className="admin-modal-overlay"><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="category-title">
+    <button className="admin-modal-close" onClick={onClose} disabled={saving} aria-label="Close">✕</button>
+    <h3 id="category-title" className="admin-form-heading">{initial ? 'Edit category' : 'Create category'}</h3>
+    <form onSubmit={submit}><div className="admin-form-grid">
+      {(['category_name_en', 'category_name_ro'] as const).map(field => <div className="admin-form-group" key={field}><label htmlFor={field}>Name ({field.endsWith('_en') ? 'English' : 'Romanian'})</label><input id={field} value={form[field] || ''} onChange={event => setForm({ ...form, [field]: event.target.value })} /></div>)}
+      {(['description_en', 'description_ro'] as const).map(field => <div className="admin-form-group" key={field}><label htmlFor={field}>Description ({field.endsWith('_en') ? 'English' : 'Romanian'})</label><textarea id={field} rows={3} value={form[field] || ''} onChange={event => setForm({ ...form, [field]: event.target.value })} /></div>)}
+      <div className="admin-form-group"><label htmlFor="category-image">Image URL</label><input id="category-image" type="url" value={form.image_url || ''} onChange={event => setForm({ ...form, image_url: event.target.value })} /></div>
+      <div className="admin-form-group"><label htmlFor="category-image-upload">Upload category image</label><input id="category-image-upload" type="file" accept="image/*" onChange={event => setFile(event.target.files?.[0] || null)} /></div>
+      <div className="admin-form-group"><label htmlFor="category-order">Display order</label><input id="category-order" type="number" step="1" required value={form.display_order ?? 0} onChange={event => setForm({ ...form, display_order: event.target.valueAsNumber })} /></div>
+      <label><input type="checkbox" checked={form.is_active} onChange={event => setForm({ ...form, is_active: event.target.checked })} /> Active</label>
+    </div>
+    {error && <p className="admin-error" role="alert">{error}</p>}
+    <div className="admin-form-actions"><button className="admin-btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save category'}</button><button type="button" className="admin-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button></div>
+    </form>
+  </div></div>
 }
 
 export default function MenuItems() {
   const [items, setItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
-
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [creatingCategory, setCreatingCategory] = useState(false)
-  const [categoryError, setCategoryError] = useState('')
-
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [editingItem, setEditingItem] = useState<MenuItem | null | undefined>(undefined)
+  const [editingCategory, setEditingCategory] = useState<Category | null | undefined>(undefined)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchCategories()
-    fetchItems()
-  }, [])
-
-  function getCategoryRef(item: MenuItem) {
-    if (!item.categories) return null
-    return Array.isArray(item.categories)
-      ? item.categories[0] || null
-      : item.categories
-  }
-
-  async function fetchCategories() {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, category_name')
-      .order('category_name')
-
-    if (!error && data) {
-      setCategories(data)
-    } else if (error) {
-      console.error('Failed to fetch categories:', error)
+  async function refresh() {
+    try {
+      const { categories, items } = await fetchAdminMenu()
+      setCategories(categories)
+      setItems(items)
+      setError('')
+    } catch (err) {
+      console.error('Failed to load administration menu:', err)
+      setError('Could not load the menu. Please try again.')
     }
-  }
-
-  async function fetchItems() {
-    setLoading(true)
-
-    const { data, error } = await supabase
-      .from('menu_items')
-      .select(`
-        *,
-        categories (
-          id,
-          category_name
-        )
-      `)
-      .order('item')
-
-    if (!error && data) {
-      setItems(data)
-    } else if (error) {
-      console.error('Failed to fetch menu items:', error)
-
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('menu_items')
-        .select('id, category_id, item, portion, description, price, status, created_at')
-        .order('item')
-
-      if (!fallbackError && fallbackData) {
-        setItems(fallbackData)
-      } else if (fallbackError) {
-        console.error('Fallback menu_items fetch failed:', fallbackError)
-      }
-    }
-
     setLoading(false)
   }
 
-  function handleAdd() {
-    setEditingItem(null)
-    setIsModalOpen(true)
+  useEffect(() => {
+    let active = true
+    void fetchAdminMenu().then(({ categories, items }) => {
+      if (!active) return
+      setCategories(categories)
+      setItems(items)
+      setLoading(false)
+    }).catch((err: unknown) => {
+      if (!active) return
+      console.error('Failed to load administration menu:', err)
+      setError('Could not load the menu. Please try again.')
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [])
+
+  async function saveItem(data: MenuItemInput) {
+    const result = editingItem
+      ? await supabase.from('menu_items').update(data).eq('id', editingItem.id).select('id').single()
+      : await supabase.from('menu_items').insert(data).select('id').single()
+    if (result.error) throw result.error
+    setSuccess(editingItem ? 'Product updated.' : 'Product created.')
+    setEditingItem(undefined)
+    await refresh()
   }
 
-  function openCategoryModal() {
-    setNewCategoryName('')
-    setCategoryError('')
-    setIsCategoryModalOpen(true)
+  async function saveCategory(data: CategoryInput) {
+    const result = editingCategory
+      ? await supabase.from('categories').update(data).eq('id', editingCategory.id).select('id').single()
+      : await supabase.from('categories').insert(data).select('id').single()
+    if (result.error) throw result.error
+    setSuccess(editingCategory ? 'Category updated.' : 'Category created.')
+    setEditingCategory(undefined)
+    await refresh()
   }
 
-  async function handleCreateCategory() {
-    const categoryName = newCategoryName.trim()
-
-    if (!categoryName) {
-      setCategoryError('Category name is required')
-      return
-    }
-
-    setCreatingCategory(true)
-    setCategoryError('')
-
-    const { error } = await supabase
-      .from('categories')
-      .insert({ category_name: categoryName })
-
+  async function deleteItem(id: string) {
+    const { error } = await supabase.from('menu_items').delete().eq('id', id).select('id').single()
     if (error) {
-      setCreatingCategory(false)
-
-      if (error.code === '23505') {
-        setCategoryError('Category already exists')
-      } else {
-        setCategoryError(error.message || 'Failed to create category')
-      }
-
+      console.error('Failed to delete product:', error)
+      setError('Could not delete the product.')
       return
     }
-
-    await fetchCategories()
-    await fetchItems()
-
-    setCreatingCategory(false)
-    setIsCategoryModalOpen(false)
-    setNewCategoryName('')
-  }
-
-  function handleEdit(item: MenuItem) {
-    setEditingItem(item)
-    setIsModalOpen(true)
-  }
-
-  async function handleSave(data: any) {
-    if (editingItem) {
-      const { error } = await supabase
-        .from('menu_items')
-        .update(data)
-        .eq('id', editingItem.id)
-
-      if (error) throw error
-    } else {
-      const { error } = await supabase
-        .from('menu_items')
-        .insert(data)
-
-      if (error) throw error
-    }
-
-    await fetchItems()
-
-    setIsModalOpen(false)
-    setEditingItem(null)
-  }
-
-  async function handleDelete(id: string) {
-    const { error } = await supabase
-      .from('menu_items')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      fetchItems()
-    }
-
     setDeleteConfirm(null)
+    setSuccess('Product deleted.')
+    await refresh()
   }
 
-  const categoryNameById = new Map(
-    categories.map((category) => [category.id, category.category_name])
-  )
-
-  const grouped = Array.from(
-    items.reduce((groups, item) => {
-      const relatedCategory = getCategoryRef(item)
-      const categoryKey = item.category_id || relatedCategory?.id || 'uncategorized'
-      const categoryName =
-        relatedCategory?.category_name ||
-        (item.category_id ? categoryNameById.get(item.category_id) : null) ||
-        'Uncategorized'
-
-      if (!groups.has(categoryKey)) {
-        groups.set(categoryKey, {
-          id: categoryKey,
-          category: categoryName,
-          items: [] as MenuItem[],
-        })
-      }
-
-      groups.get(categoryKey)?.items.push(item)
-      return groups
-    }, new Map<string, { id: string; category: string; items: MenuItem[] }>()).values()
-  )
-
-  return (
-    <div className="admin-section">
-
-      <div className="admin-section-header">
-        <h2 className="admin-section-title">
-          Menu Items
-        </h2>
-
-        <span className="admin-section-count">
-          {items.length} items
-        </span>
-      </div>
-
-      <div className="admin-top-actions">
-        <button
-          className="admin-btn-primary-catogory"
-          onClick={openCategoryModal}
-        >
-          Create Category
-        </button>
-
-        <button
-          className="admin-btn-primary"
-          onClick={handleAdd}
-        >
-          + Add Item
-        </button>
-      </div>
-
-      <ItemModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setEditingItem(null)
-        }}
-        onSave={handleSave}
-        initialData={editingItem}
-        categories={categories}
-      />
-
-      {loading ? (
-        <div className="admin-loading-text">
-          Loading items...
+  return <div className="admin-section">
+    <div className="admin-section-header"><h2 className="admin-section-title">Menu items</h2><span className="admin-section-count">{items.length} items</span></div>
+    <div className="admin-top-actions"><button className="admin-btn-primary-catogory" onClick={() => { setSuccess(''); setEditingCategory(null) }}>Create category</button><button className="admin-btn-primary" onClick={() => { setSuccess(''); setEditingItem(null) }}>+ Add item</button></div>
+    {error && <p className="admin-error" role="alert">{error} <button type="button" onClick={() => void refresh()}>Retry</button></p>}
+    {success && <p role="status">{success}</p>}
+    {loading ? <div className="admin-loading-text">Loading items...</div> : <>
+      <h3>Categories</h3>
+      {categories.length === 0 && <p>No categories found.</p>}
+      {categories.map(category => <div className="admin-group" key={category.id}>
+        <h4 className="admin-group-title">{category.category_name_en || category.category_name_ro} {!category.is_active && '(inactive)'}</h4>
+        <button className="admin-btn-edit" onClick={() => setEditingCategory(category)}>Edit category</button>
+        <div className="admin-table">
+          <div className="admin-table-head"><span>Item</span><span>Portion</span><span>Description</span><span>Price (RON)</span><span>Status</span><span>Actions</span></div>
+          {items.filter(item => item.category_id === category.id).map(item => <div className="admin-table-row" key={item.id}>
+            <span>{item.item_name_en || item.item_name_ro}</span><span>{item.portion || '—'}</span><span>{item.description_en || item.description_ro || '—'}</span><span>{formatCurrency(item.price)}</span>
+            <span>{!item.is_active ? 'Inactive' : item.is_available ? 'Available' : 'Unavailable'}{item.is_featured ? ' · Featured' : ''}</span>
+            <span className="admin-item-action-buttons">{deleteConfirm === item.id ? <><span>Delete?</span><button className="admin-btn-delete" onClick={() => void deleteItem(item.id)}>Yes</button><button className="admin-btn-secondary-sm" onClick={() => setDeleteConfirm(null)}>No</button></> : <><button className="admin-btn-edit" onClick={() => setEditingItem(item)}>Edit</button><button className="admin-btn-delete" onClick={() => setDeleteConfirm(item.id)}>Delete</button></>}</span>
+          </div>)}
         </div>
-      ) : items.length === 0 ? (
-        <div className="admin-empty">
-          No menu items found.
-        </div>
-      ) : (
-        <>
-          {grouped.map(
-            (group) =>
-              group.items.length > 0 && (
-                <div
-                  key={group.id}
-                  className="admin-group"
-                >
-                  <h4 className="admin-group-title">
-                    {group.category}
-                  </h4>
-
-                  <div className="admin-table">
-
-                    <div className="admin-table-head">
-                      <span>Item</span>
-                      <span>Portion</span>
-                      <span>Description</span>
-                      <span>Price (RON)</span>
-                      <span>Status</span>
-                      <span>Actions</span>
-                    </div>
-
-                    {group.items.map((menuItem) => (
-                      <div
-                        key={menuItem.id}
-                        className="admin-table-row"
-                      >
-                        <span className="admin-item-name">
-                          <span className="admin-item-value">{menuItem.item}</span>
-                        </span>
-
-                        <span>
-                          <span className="admin-item-value">{menuItem.portion || '—'}</span>
-                        </span>
-
-                        <span>
-                          <span className="admin-item-value">{menuItem.description || '—'}</span>
-                        </span>
-
-                        <span>
-                          <span className="admin-item-value">{formatCurrency(menuItem.price)}</span>
-                        </span>
-
-                        <span>
-                          <span className="admin-item-value">
-                            <span
-                              className={`admin-status-badge ${
-                                menuItem.status
-                                  ? 'active'
-                                  : 'inactive'
-                              }`}
-                            >
-                              {menuItem.status
-                                ? 'Active'
-                                : 'Inactive'}
-                            </span>
-                          </span>
-                        </span>
-
-                        <span className="admin-item-actions">
-                          <span className="admin-item-action-buttons">
-                            {deleteConfirm === menuItem.id ? (
-                              <>
-                                <span className="admin-confirm-text">
-                                  Delete?
-                                </span>
-
-                                <button
-                                  className="admin-btn-delete"
-                                  onClick={() =>
-                                    handleDelete(menuItem.id)
-                                  }
-                                >
-                                  Yes
-                                </button>
-
-                                <button
-                                  className="admin-btn-secondary-sm"
-                                  onClick={() =>
-                                    setDeleteConfirm(null)
-                                  }
-                                >
-                                  No
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  className="admin-btn-edit"
-                                  onClick={() =>
-                                    handleEdit(menuItem)
-                                  }
-                                >
-                                  Edit
-                                </button>
-
-                                <button
-                                  className="admin-btn-delete"
-                                  onClick={() =>
-                                    setDeleteConfirm(menuItem.id)
-                                  }
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                          </span>
-                        </span>
-                      </div>
-                    ))}
-
-                  </div>
-                </div>
-              )
-          )}
-
-        </>
-      )}
-
-      {isCategoryModalOpen && (
-        <div
-          className="admin-modal-overlay"
-          onClick={() => {
-            if (!creatingCategory) {
-              setIsCategoryModalOpen(false)
-            }
-          }}
-        >
-          <div
-            className="admin-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="admin-modal-close"
-              onClick={() => setIsCategoryModalOpen(false)}
-              disabled={creatingCategory}
-            >
-              ✕
-            </button>
-
-            <h3 className="admin-form-heading">
-              + Create Category
-            </h3>
-
-            <div className="admin-form-group">
-              <label>Category Name *</label>
-
-              <input
-                value={newCategoryName}
-                onChange={(event) => setNewCategoryName(event.target.value)}
-                placeholder="Espresso & Coffee"
-                autoFocus
-              />
-            </div>
-
-            {categoryError && (
-              <p className="admin-error">
-                {categoryError}
-              </p>
-            )}
-
-            <div className="admin-form-actions">
-              <button
-                className="admin-btn-primary"
-                onClick={handleCreateCategory}
-                disabled={creatingCategory}
-              >
-                {creatingCategory ? 'Creating...' : 'Create Category'}
-              </button>
-
-              <button
-                className="admin-btn-secondary"
-                onClick={() => setIsCategoryModalOpen(false)}
-                disabled={creatingCategory}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+      </div>)}
+      {items.some(item => !item.category_id || !categories.some(category => category.id === item.category_id)) && <div className="admin-group"><h4>Uncategorized</h4>{items.filter(item => !item.category_id || !categories.some(category => category.id === item.category_id)).map(item => <div key={item.id}>{item.item_name_en || item.item_name_ro} <button className="admin-btn-edit" onClick={() => setEditingItem(item)}>Edit</button></div>)}</div>}
+    </>}
+    {editingItem !== undefined && <ItemModal initialData={editingItem} categories={categories} onClose={() => setEditingItem(undefined)} onSave={saveItem} />}
+    {editingCategory !== undefined && <CategoryModal initial={editingCategory} onClose={() => setEditingCategory(undefined)} onSave={saveCategory} />}
+  </div>
 }

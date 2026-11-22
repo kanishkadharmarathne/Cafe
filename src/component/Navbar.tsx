@@ -4,8 +4,10 @@ import './Navbar.css'
 import AuthModal from './AuthModal'
 import { supabase } from '../lib/supabase'
 import { AiOutlineMenuUnfold } from "react-icons/ai";
+import { useLanguage } from '../lib/language'
 
 export default function Navbar() {
+  const { language, setLanguage, t } = useLanguage()
   const navigate = useNavigate()
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
@@ -95,6 +97,13 @@ export default function Navbar() {
         </div>
 
         <div className="nav-auth">
+          <label className="nav-language">
+            <span className="visually-hidden">{t('Language', 'Limba')}</span>
+            <select aria-label={t('Language', 'Limba')} value={language} onChange={(event) => setLanguage(event.target.value === 'en' ? 'en' : 'ro')}>
+              <option value="ro">RO</option>
+              <option value="en">EN</option>
+            </select>
+          </label>
           {userName ? (
             <>
               <span className="nav-user-name">{userName}</span>

@@ -5,11 +5,12 @@ import '../Menu.css'
 
 interface MenuItem {
   id: string
-  item: string
+  item_name_en: string | null
+  item_name_ro: string | null
   portion: string
-  description: string
+  description_en: string | null
+  description_ro: string | null
   price: number
-  status: boolean
   category_id: string | null
 }
 
@@ -22,7 +23,8 @@ interface CartEntry {
 
 interface Category {
   id: string
-  category_name: string
+  category_name_en: string | null
+  category_name_ro: string | null
 }
 
 export default function DiOrders() {
@@ -40,27 +42,31 @@ export default function DiOrders() {
 
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
-        .select('id, category_name')
-        .order('category_name')
+        .select('id, category_name_en, category_name_ro')
+        .eq('is_active', true)
+        .order('display_order')
 
       const { data: menuData, error: menuError } = await supabase
         .from('menu_items')
         .select(`
           id,
-          item,
+          item_name_en,
+          item_name_ro,
           portion,
-          description,
+          description_en,
+          description_ro,
           price,
-          status,
           category_id
         `)
-        .eq('status', true)
-        .order('item')
+        .eq('is_active', true)
+        .eq('is_available', true)
+        .order('display_order')
 
       if (!categoriesError && categoriesData) {
         setCategories(categoriesData as Category[])
       } else if (categoriesError) {
         console.error('Failed to fetch categories:', categoriesError)
+        setMessage('Unable to load menu categories right now.')
       }
 
       if (!menuError && menuData) {
@@ -78,10 +84,10 @@ export default function DiOrders() {
 
   const groupedMenu = useMemo(
     () => {
-      const categoryNameById = new Map(categories.map((category) => [category.id, category.category_name]))
+      const categoryNameById = new Map(categories.map((category) => [category.id, category.category_name_en || category.category_name_ro || 'Uncategorized']))
 
       return Array.from(
-        menuItems
+        menuItems.filter(item => !item.category_id || categoryNameById.has(item.category_id))
           .reduce((groups, item) => {
             const categoryKey = item.category_id || 'uncategorized'
             const categoryName = item.category_id
@@ -122,7 +128,7 @@ export default function DiOrders() {
         ...prev,
         {
           id: menuItem.id,
-          name: menuItem.item,
+          name: menuItem.item_name_en || menuItem.item_name_ro || 'Unnamed item',
           qty: 1,
           amount: menuItem.price,
         },
@@ -339,9 +345,9 @@ export default function DiOrders() {
               {group.items.map((menuItem) => (
                 <div className="menu-item" key={menuItem.id}>
                   <div className="menu-item-info">
-                    <h3>{menuItem.item}</h3>
+                    <h3>{menuItem.item_name_en || menuItem.item_name_ro}</h3>
                     {menuItem.portion && <span className="menu-item-portion">{menuItem.portion}</span>}
-                    <p>{menuItem.description}</p>
+                    <p>{menuItem.description_en || menuItem.description_ro}</p>
                   </div>
 
                   <div className="menu-item-right">

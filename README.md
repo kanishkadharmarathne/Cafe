@@ -45,6 +45,12 @@ Restaurant street address, phone, email, and opening hours have not been supplie
 
 Shared CSS tokens define the forest-green, warm-gold, cream, white, charcoal, and muted-gray palette, typography, spacing constraints, radii, and focus treatment. `formatCurrency` is the single UI formatter for RON amounts and uses `ro-RO` with two decimal places. Stored amounts are presented as-is; no exchange-rate conversion is performed.
 
+## Menu and categories
+
+The public menu reads active categories and products from Supabase in display order. The header language selector chooses the English or Romanian menu fields and stores the preference locally. Unavailable products remain visible but cannot be added to the cart; featured products are shown separately. Images come from each record's `image_url`.
+
+The existing admin menu supports editing both languages, ordering, visibility and product availability. Category and product images can be uploaded to the existing `taste_of_ceylon_menu_images` bucket. Uploads and database edits require the corresponding Supabase permissions; no service-role key is used by the frontend.
+
 ## Development
 
 - `npm run dev` — start the Vite development server
