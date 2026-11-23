@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import './CheckoutModal.css'
-import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/currency'
+import { createSecureOrder, getCreatedOrderReference, type OrderType, type SpiceLevel } from '../lib/orders'
+import { SpiceSelector } from './SpiceLevel'
+import { useLanguage } from '../lib/language'
+import { supabase } from '../lib/supabase'
+import './CheckoutModal.css'
 
-interface CartEntry { id: string; name: string; qty: number; amount: number }
+interface CartEntry {
+  id: string
+  name: string
+  qty: number
+  amount: number
+  image_url?: string | null
+}
 
 interface CheckoutModalProps {
   cart: CartEntry[]
@@ -13,553 +22,262 @@ interface CheckoutModalProps {
   onSuccess: () => void
 }
 
-type Step = 'details' | 'payment' | 'confirm'
-type CardType = 'visa' | 'mastercard' | ''
-
-function formatCardNumber(val: string) {
-  return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
-}
-
-function formatExpiry(val: string) {
-  const digits = val.replace(/\D/g, '').slice(0, 4)
-  if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2)
-  return digits
-}
+type CustomerOrderType = Exclude<OrderType, 'Dine In'>
 
 export default function CheckoutModal({ cart, grandTotal, onClose, onSuccess }: CheckoutModalProps) {
-  const [step, setStep] = useState<Step>('details')
-
-  const [details, setDetails] = useState({ name: '', email: '', phone: '', order_type: '', delivery_address: '' })
-  const [detailsErrors, setDetailsErrors] = useState<Record<string, string>>({})
-  const [locationLoading, setLocationLoading] = useState(false)
-  const [locationError, setLocationError] = useState('')
+  const { t, language } = useLanguage()
+  const [details, setDetails] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    orderType: '' as CustomerOrderType | '',
+    pickupMode: 'asap' as 'asap' | 'scheduled',
+    pickupTime: '',
+    deliveryAddress: '',
+    deliveryInstructions: '',
+    notes: '',
+  })
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null)
-
-  const [cardType, setCardType] = useState<CardType>('')
-  const [payment, setPayment] = useState({ holder: '', number: '', expiry: '', cvv: '' })
-  const [showCvv, setShowCvv] = useState(false)
-  const [payErrors, setPayErrors] = useState<Record<string, string>>({})
+  const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
-  const [orderId, setOrderId] = useState<string>('')
+  const [orderReference, setOrderReference] = useState('')
+  const [created, setCreated] = useState(false)
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
+  const [spiceLevel, setSpiceLevel] = useState<SpiceLevel>('medium')
 
   useEffect(() => {
     async function prefillFromSession() {
-      const {
-        data: { user },
-        error
-      } = await supabase.auth.getUser()
-
-      if (error || !user) return
-
-      const fullName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.user_metadata?.display_name ||
-        ''
-
-      setDetails((prev) => ({
-        ...prev,
-        name: prev.name || fullName,
-        email: prev.email || user.email || ''
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error('Failed to prefill checkout details:', error)
+        return
+      }
+      if (!user) return
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.display_name || ''
+      setDetails(previous => ({
+        ...previous,
+        name: previous.name || fullName,
+        phone: previous.phone || user.phone || '',
+        email: previous.email || user.email || '',
       }))
     }
-
-    prefillFromSession()
+    void prefillFromSession()
   }, [])
 
-  // ── Validation ──
-  function validateDetails() {
-    const e: Record<string, string> = {}
-    if (!details.name.trim()) e.name = 'Full name is required'
-    if (!details.email) e.email = 'Email is required'
-    else if (!/\S+@\S+\.\S+/.test(details.email)) e.email = 'Enter a valid email'
-    if (!details.phone) e.phone = 'Phone number is required'
-    else if (!/^\d{10}$/.test(details.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid 10-digit number'
-    if (!details.order_type.trim()) e.order_type = 'Order type is required'
-    if (details.order_type === 'Home Delivery' && !details.delivery_address.trim()) {
-      e.delivery_address = 'Current location is required for home delivery'
+  function getErrorMessage(reason: unknown) {
+    const message = reason instanceof Error ? reason.message.toLowerCase() : ''
+    if (message.includes('not authenticated') || message.includes('jwt') || message.includes('permission')) {
+      return t('Please sign in again before placing your order.', 'Autentifică-te din nou înainte de a plasa comanda.')
     }
-    return e
-  }
-
-  function handleOrderTypeChange(nextType: 'Takeaway' | 'Home Delivery') {
-    setDetails((prev) => ({
-      ...prev,
-      order_type: nextType,
-      delivery_address: nextType === 'Takeaway' ? '' : prev.delivery_address,
-    }))
-
-    if (nextType === 'Takeaway') {
-      setLocationCoords(null)
-      setLocationError('')
+    if (message.includes('unavailable') || message.includes('price') || message.includes('menu item')) {
+      return t('A menu item is unavailable or has changed price. Please review your cart and try again.', 'Un produs nu mai este disponibil sau și-a schimbat prețul. Verifică coșul și încearcă din nou.')
     }
+    return t('We could not create your order. Please review your details and try again.', 'Comanda nu a putut fi creată. Verifică datele și încearcă din nou.')
   }
 
   function handleUseCurrentLocation() {
     if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported in this browser.')
+      setError(t('Location is not supported by this browser.', 'Acest browser nu permite accesul la locație.'))
       return
     }
-
-    setLocationLoading(true)
-    setLocationError('')
-
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-
-        const value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-
-        setLocationCoords({ lat: latitude, lng: longitude })
-        setDetails((prev) => ({ ...prev, delivery_address: value }))
-        setLocationLoading(false)
+      ({ coords }) => {
+        setLocationCoords({ lat: coords.latitude, lng: coords.longitude })
+        setError('')
       },
-      (error) => {
-        setLocationLoading(false)
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationError('Location permission denied. Please allow location access.')
-          return
-        }
-
-        setLocationError('Unable to get your current location. Please try again.')
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-      }
+      () => setError(t('Unable to get your location. You can enter the address manually.', 'Locația nu a putut fi preluată. Poți introduce adresa manual.')),
+      { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
-  function validatePayment() {
-    const e: Record<string, string> = {}
-    if (!cardType) e.cardType = 'Please select a card type'
-    if (!payment.holder.trim()) e.holder = 'Card holder name is required'
-    const digits = payment.number.replace(/\s/g, '')
-    if (!digits) e.number = 'Card number is required'
-    else if (digits.length < 16) e.number = 'Enter a valid 16-digit card number'
-    if (!payment.expiry) e.expiry = 'Expiry date is required'
-    else if (!/^\d{2}\/\d{2}$/.test(payment.expiry)) e.expiry = 'Use MM/YY format'
-    if (!payment.cvv) e.cvv = 'CVV is required'
-    else if (payment.cvv.length < 3) e.cvv = 'Enter 3-digit CVV'
-    return e
-  }
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (processing) return
+    setError('')
 
-  function handleDetailsNext(e: React.FormEvent) {
-    e.preventDefault()
-    const errs = validateDetails()
-    setDetailsErrors(errs)
-    if (Object.keys(errs).length === 0) setStep('payment')
-  }
-
-  const stepLabels: { key: Step; label: string }[] = [
-    { key: 'details', label: 'Your Details' },
-    { key: 'payment', label: 'Payment' },
-    { key: 'confirm', label: 'Confirmation' },
-  ]
-
-
-
-  async function orderSave() {
-  const invalidItems = cart.filter(item => !item.id);
-  if (invalidItems.length > 0) {
-    console.error("Missing item IDs:", invalidItems);
-    throw new Error("Some cart items do not have item IDs.");
-  }
-
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser()
-
-  if (authError) {
-    console.error("Failed to get current user:", authError)
-    throw authError
-  }
-
-  const baseOrderPayload = {
-    user_id: user?.id ?? null,
-    customer_name: details.name,
-    email: details.email,
-    phone: details.phone,
-    order_type: details.order_type,
-    total_value: grandTotal,
-    payment_status: true,
-  }
-
-  const locationPayload = details.order_type === 'Home Delivery'
-    ? {
-        ...baseOrderPayload,
-        delivery_address: details.delivery_address,
-        delivery_latitude: locationCoords?.lat ?? null,
-        delivery_longitude: locationCoords?.lng ?? null,
+    if (!cart.length || cart.some(item => !item.id || !Number.isInteger(item.qty) || item.qty < 1)) {
+      setError(t('Your cart contains no valid items. Please review it.', 'Coșul nu conține produse valide. Verifică-l, te rog.'))
+      return
+    }
+    if (!details.name.trim() || !details.phone.trim() || !details.orderType) {
+      setError(t('Name, phone number and order type are required.', 'Numele, numărul de telefon și tipul comenzii sunt obligatorii.'))
+      return
+    }
+    if (details.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.email)) {
+      setError(t('Enter a valid email address.', 'Introdu o adresă de e-mail validă.'))
+      return
+    }
+    if (details.orderType === 'Pickup' && details.pickupMode === 'scheduled') {
+      const pickupDate = new Date(details.pickupTime)
+      if (!details.pickupTime || !Number.isFinite(pickupDate.getTime()) || pickupDate.getTime() <= Date.now()) {
+        setError(t('Choose a valid future pickup time.', 'Alege o oră de ridicare validă, în viitor.'))
+        return
       }
-    : baseOrderPayload
+    }
+    if (details.orderType === 'Delivery' && !details.deliveryAddress.trim()) {
+      setError(t('A delivery address is required.', 'Adresa de livrare este obligatorie.'))
+      return
+    }
 
-  let orderResponse = await supabase
-    .from("orders")
-    .insert(locationPayload)
-    .select("order_id")
-    .single();
+    setProcessing(true)
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError) throw authError
+      if (!user) {
+        setError(t('Please sign in before placing your order.', 'Autentifică-te înainte de a plasa comanda.'))
+        return
+      }
 
-  if (
-    orderResponse.error &&
-    details.order_type === 'Home Delivery' &&
-    /delivery_address|delivery_latitude|delivery_longitude|column/i.test(orderResponse.error.message)
-  ) {
-    orderResponse = await supabase
-      .from("orders")
-      .insert(baseOrderPayload)
-      .select("order_id")
-      .single();
+      const result = await createSecureOrder({
+        order_type: details.orderType,
+        spice_level: spiceLevel,
+        customer_name: details.name.trim(),
+        phone: details.phone.trim(),
+        email: details.email.trim() || null,
+        items: cart.map(item => ({
+          item_id: item.id,
+          quantity: item.qty,
+          selected_options: [],
+          ...(itemNotes[item.id]?.trim() ? { item_notes: itemNotes[item.id].trim() } : {}),
+        })),
+        ...(details.notes.trim() ? { notes: details.notes.trim() } : {}),
+        ...(details.orderType === 'Pickup' ? {
+          pickup_mode: details.pickupMode,
+          pickup_time: details.pickupMode === 'scheduled' ? new Date(details.pickupTime).toISOString() : null,
+        } : {}),
+        ...(details.orderType === 'Delivery' ? {
+          delivery_address: details.deliveryAddress.trim(),
+          delivery_instructions: details.deliveryInstructions.trim(),
+          ...(locationCoords ? {
+            delivery_latitude: locationCoords.lat,
+            delivery_longitude: locationCoords.lng,
+          } : {}),
+        } : {}),
+      })
+      setOrderReference(getCreatedOrderReference(result))
+      setCreated(true)
+      onSuccess()
+    } catch (reason) {
+      console.error('Failed to create order:', reason)
+      setError(getErrorMessage(reason))
+    } finally {
+      setProcessing(false)
+    }
   }
-
-  const { data: order, error: orderError } = orderResponse
-
-
-  if (orderError) {
-    console.error("Order save error:", orderError);
-    throw orderError;
-  }
-
-  const orderItems = cart.map((item) => ({
-    order_id: order.order_id,
-    item_id: item.id,          // must exist
-    item_name: item.name,
-    quantity: item.qty
-  }));
-
-  const { error: itemError } = await supabase
-    .from("order_items")
-    .insert(orderItems);
-
-
-  if (itemError) {
-    console.error("Order items save error:", itemError);
-    throw itemError;
-  }
-  setOrderId(order.order_id);
-}
-async function handlePaySubmit(e: React.FormEvent) {
-  e.preventDefault();
-
-  const errs = validatePayment();
-  setPayErrors(errs);
-
-  if (Object.keys(errs).length > 0) return;
-
-  try {
-    setProcessing(true);
-
-    await orderSave();
-
-    setProcessing(false);
-    setStep("confirm");
-  } catch (err) {
-    console.error(err);
-    setProcessing(false);
-    alert("Failed to save order.");
-  }
-}
-
-  const stepIndex = { details: 0, payment: 1, confirm: 2 }
 
   const modal = (
-    <div className="co-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="co-modal" role="dialog" aria-modal="true">
-
-        {/* Header */}
+    <div className="co-overlay" onClick={event => event.target === event.currentTarget && !processing && onClose()}>
+      <div className="co-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" lang={language}>
         <div className="co-header">
-          <div className="co-logo">☕ <span>Checkout</span></div>
-          {step !== 'confirm' && (
-            <button className="co-close" onClick={onClose} aria-label="Close">✕</button>
-          )}
+          <div className="co-logo">☕ <span id="checkout-title">{t('Checkout', 'Finalizare comandă')}</span></div>
+          <button type="button" className="co-close" onClick={onClose} disabled={processing} aria-label={t('Close', 'Închide')}>✕</button>
         </div>
-
-        {/* Step indicator */}
-        <div className="co-steps">
-          {stepLabels.map((s, i) => (
-            <div key={s.key} className={`co-step ${stepIndex[step] >= i ? 'done' : ''} ${step === s.key ? 'active' : ''}`}>
-              <div className="co-step-dot">{stepIndex[step] > i ? '✓' : i + 1}</div>
-              <span>{s.label}</span>
-              {i < stepLabels.length - 1 && <div className="co-step-line" />}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Step 1: Details ── */}
-        {step === 'details' && (
+        {created ? (
+          <div className="co-body co-confirm">
+            <div className="co-success-icon">✓</div>
+            <h2>{t('Order placed!', 'Comanda a fost plasată!')}</h2>
+            <p>{t('Thank you. Your order is awaiting confirmation.', 'Îți mulțumim. Comanda ta așteaptă confirmarea.')}</p>
+            {orderReference && <p className="co-order-ref">{t('Order number', 'Număr comandă')}: {orderReference}</p>}
+            <button type="button" className="co-submit" onClick={onClose}>{t('Back to menu', 'Înapoi la meniu')}</button>
+          </div>
+        ) : (
           <div className="co-body">
-            {/* Order summary */}
             <div className="co-summary">
-              <h3 className="co-section-title">Order Summary</h3>
+              <h3 className="co-section-title">{t('Order summary', 'Sumarul comenzii')}</h3>
               <ul className="co-order-list">
-                {cart.map((item) => (
-                  <li key={item.name} className="co-order-item">
-                    <span></span>
+                {cart.map(item => (
+                  <li key={item.id} className="co-order-item">
+                    {item.image_url && <img src={item.image_url} alt="" width="44" height="44" />}
                     <span>{item.name} <em>×{item.qty}</em></span>
                     <span>{formatCurrency(item.amount * item.qty)}</span>
+                    <label>
+                      {t('Item notes (optional)', 'Note pentru produs (opțional)')}
+                      <input maxLength={200} value={itemNotes[item.id] ?? ''} onChange={event => setItemNotes({ ...itemNotes, [item.id]: event.target.value })} />
+                    </label>
                   </li>
                 ))}
               </ul>
               <div className="co-order-total">
-                <span>Total</span><span>{formatCurrency(grandTotal)}</span>
+                <span>{t('Subtotal (estimate)', 'Subtotal estimativ')}</span><span>{formatCurrency(grandTotal)}</span>
               </div>
+              <SpiceSelector value={spiceLevel} onChange={setSpiceLevel} />
             </div>
-
-            <form className="co-form" onSubmit={handleDetailsNext} noValidate>
-              <h3 className="co-section-title">Delivery Details</h3>
-
+            <form className="co-form" onSubmit={handleSubmit}>
+              <h3 className="co-section-title">{t('Contact details', 'Date de contact')}</h3>
+              <div className="co-field">
+                <label htmlFor="co-name">{t('Full name', 'Nume complet')}</label>
+                <input id="co-name" autoComplete="name" required value={details.name} onChange={event => setDetails({ ...details, name: event.target.value })} />
+              </div>
               <div className="co-row">
                 <div className="co-field">
-                  <label htmlFor="co-name">Name</label>
-                  <input id="co-name" type="text" placeholder="Your full name" autoComplete="name"
-                    value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })}
-                    className={detailsErrors.name ? 'err' : ''} />
-                  {detailsErrors.name && <span className="co-err">{detailsErrors.name}</span>}
+                  <label htmlFor="co-phone">{t('Phone number', 'Număr de telefon')}</label>
+                  <input id="co-phone" type="tel" autoComplete="tel" required value={details.phone} onChange={event => setDetails({ ...details, phone: event.target.value })} />
                 </div>
                 <div className="co-field">
-                  <label htmlFor="co-phone">Phone</label>
-                  <input id="co-phone" type="tel" placeholder="10-digit number" autoComplete="tel"
-                    value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })}
-                    className={detailsErrors.phone ? 'err' : ''} />
-                  {detailsErrors.phone && <span className="co-err">{detailsErrors.phone}</span>}
+                  <label htmlFor="co-email">{t('Email (optional)', 'E-mail (opțional)')}</label>
+                  <input id="co-email" type="email" autoComplete="email" value={details.email} onChange={event => setDetails({ ...details, email: event.target.value })} />
                 </div>
               </div>
-
               <div className="co-field">
-                <label htmlFor="co-email">Email</label>
-                <input id="co-email" type="email" placeholder="your@email.com" autoComplete="email"
-                  value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })}
-                  className={detailsErrors.email ? 'err' : ''} />
-                {detailsErrors.email && <span className="co-err">{detailsErrors.email}</span>}
+                <label htmlFor="co-order-type">{t('Order type', 'Tipul comenzii')}</label>
+                <select id="co-order-type" required value={details.orderType} onChange={event => setDetails({ ...details, orderType: event.target.value as CustomerOrderType | '' })}>
+                  <option value="">{t('Select an order type', 'Selectează tipul comenzii')}</option>
+                  <option value="Takeaway">{t('Takeaway', 'La pachet')}</option>
+                  <option value="Pickup">{t('Pickup', 'Ridicare')}</option>
+                  <option value="Delivery">{t('Delivery', 'Livrare')}</option>
+                </select>
               </div>
-
-              <div className="co-field">
-                <label>Order Type</label>
-
-                <div className="order-type-container">
-                  <div
-                    className={`order-type-card ${details.order_type === 'Takeaway' ? 'active' : ''}`}
-                    onClick={() => handleOrderTypeChange('Takeaway')}
-                  >
-                    <span className="order-type-icon">🍱</span>
-                    <h4>Takeaway</h4>
-                    <p>Pick up your order from the restaurant.</p>
+              {details.orderType === 'Pickup' && (
+                <>
+                  <div className="co-field">
+                    <label htmlFor="co-pickup-mode">{t('Pickup time', 'Ora ridicării')}</label>
+                    <select id="co-pickup-mode" value={details.pickupMode} onChange={event => setDetails({ ...details, pickupMode: event.target.value as 'asap' | 'scheduled' })}>
+                      <option value="asap">{t('As soon as possible', 'Cât mai curând')}</option>
+                      <option value="scheduled">{t('Schedule pickup', 'Programează ridicarea')}</option>
+                    </select>
                   </div>
-
-                  <div
-                    className={`order-type-card ${details.order_type === 'Home Delivery' ? 'active' : ''}`}
-                    onClick={() => handleOrderTypeChange('Home Delivery')}
-                  >
-                    <span className="order-type-icon">🚚</span>
-                    <h4>Home Delivery</h4>
-                    <p>Deliver your order to your current location.</p>
-                  </div>
-                </div>
-
-                {detailsErrors.order_type && (
-                  <span className="co-err">{detailsErrors.order_type}</span>
-                )}
-
-                {details.order_type === 'Home Delivery' && (
-                  <div className="co-delivery-location">
-                    <button
-                      type="button"
-                      className="co-location-btn"
-                      onClick={handleUseCurrentLocation}
-                      disabled={locationLoading}
-                    >
-                      {locationLoading ? 'Getting current location...' : 'Use Current Location'}
-                    </button>
-
-                    <input
-                      type="text"
-                      placeholder="Delivery location"
-                      value={details.delivery_address}
-                      onChange={(e) => setDetails({ ...details, delivery_address: e.target.value })}
-                      className={detailsErrors.delivery_address ? 'err' : ''}
-                    />
-
-                    {detailsErrors.delivery_address && (
-                      <span className="co-err">{detailsErrors.delivery_address}</span>
-                    )}
-
-                    {locationError && <span className="co-err">{locationError}</span>}
-
-                    {locationCoords && (
-                      <div className="co-map-preview">
-                        <iframe
-                          title="Current delivery location"
-                          src={`https://maps.google.com/maps?q=${locationCoords.lat},${locationCoords.lng}&z=16&output=embed`}
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button type="submit" className="co-submit" >Continue to Payment →</button>
-            </form>
-          </div>
-        )}
-
-        {/* ── Step 2: Payment ── */}
-        {step === 'payment' && (
-          <div className="co-body">
-            <div className="co-pay-total-bar">
-              <span>Amount to pay</span>
-              <span className="co-pay-amount">{formatCurrency(grandTotal)}</span>
-            </div>
-
-            <form className="co-form" onSubmit={handlePaySubmit} noValidate>
-              <h3 className="co-section-title">Select Card Type</h3>
-
-              {payErrors.cardType && <span className="co-err">{payErrors.cardType}</span>}
-              <div className="co-card-types">
-                <button type="button"
-                  className={`co-card-option ${cardType === 'visa' ? 'selected' : ''}`}
-                  onClick={() => setCardType('visa')}>
-                  <div className="co-card-logo visa-logo">
-                    <span className="visa-text">VISA</span>
-                  </div>
-                  <span>Visa</span>
-                </button>
-                <button type="button"
-                  className={`co-card-option ${cardType === 'mastercard' ? 'selected' : ''}`}
-                  onClick={() => setCardType('mastercard')}>
-                  <div className="co-card-logo mc-logo">
-                    <span className="mc-circle mc-left" />
-                    <span className="mc-circle mc-right" />
-                  </div>
-                  <span>Mastercard</span>
-                </button>
-              </div>
-
-              {/* Card preview */}
-              {cardType && (
-                <div className={`co-card-preview ${cardType}`}>
-                  <div className="cp-top">
-                    <span className="cp-chip">▬</span>
-                    {cardType === 'visa'
-                      ? <span className="cp-brand visa-text-sm">VISA</span>
-                      : <div className="cp-mc-circles"><span /><span /></div>
-                    }
-                  </div>
-                  <div className="cp-number">
-                    {payment.number || '•••• •••• •••• ••••'}
-                  </div>
-                  <div className="cp-bottom">
-                    <div>
-                      <div className="cp-label">Card Holder</div>
-                      <div className="cp-value">{payment.holder || 'YOUR NAME'}</div>
+                  {details.pickupMode === 'scheduled' && (
+                    <div className="co-field">
+                      <label htmlFor="co-pickup-time">{t('Scheduled date and time', 'Data și ora programată')}</label>
+                      <input id="co-pickup-time" type="datetime-local" required value={details.pickupTime} onChange={event => setDetails({ ...details, pickupTime: event.target.value })} />
                     </div>
-                    <div>
-                      <div className="cp-label">Expires</div>
-                      <div className="cp-value">{payment.expiry || 'MM/YY'}</div>
-                    </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
-
-              <h3 className="co-section-title" style={{ marginTop: '24px' }}>Card Details</h3>
-
+              {details.orderType === 'Delivery' && (
+                <>
+                  <div className="co-field">
+                    <label htmlFor="co-address">{t('Delivery address', 'Adresa de livrare')}</label>
+                    <textarea id="co-address" required value={details.deliveryAddress} onChange={event => setDetails({ ...details, deliveryAddress: event.target.value })} />
+                    <button type="button" className="co-location-btn" onClick={handleUseCurrentLocation}>{t('Use current location', 'Folosește locația curentă')}</button>
+                    {locationCoords && <span>{t('Location added', 'Locație adăugată')}</span>}
+                    {locationCoords && <div className="co-map-preview">
+                      <iframe
+                        title={t('Selected delivery location', 'Locația de livrare selectată')}
+                        src={`https://maps.google.com/maps?q=${locationCoords.lat},${locationCoords.lng}&z=16&output=embed`}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>}
+                  </div>
+                  <div className="co-field">
+                    <label htmlFor="co-instructions">{t('Delivery instructions (optional)', 'Instrucțiuni de livrare (opțional)')}</label>
+                    <textarea id="co-instructions" value={details.deliveryInstructions} onChange={event => setDetails({ ...details, deliveryInstructions: event.target.value })} />
+                  </div>
+                </>
+              )}
               <div className="co-field">
-                <label htmlFor="co-holder">Card Holder Name</label>
-                <input id="co-holder" type="text" placeholder="Name on card" autoComplete="cc-name"
-                  value={payment.holder}
-                  onChange={(e) => setPayment({ ...payment, holder: e.target.value.toUpperCase() })}
-                  className={payErrors.holder ? 'err' : ''} />
-                {payErrors.holder && <span className="co-err">{payErrors.holder}</span>}
+                <label htmlFor="co-notes">{t('Order notes (optional)', 'Note pentru comandă (opțional)')}</label>
+                <textarea id="co-notes" value={details.notes} onChange={event => setDetails({ ...details, notes: event.target.value })} />
               </div>
-
-              <div className="co-field">
-                <label htmlFor="co-number">Card Number</label>
-                <input id="co-number" type="text" placeholder="0000 0000 0000 0000"
-                  inputMode="numeric" autoComplete="cc-number"
-                  value={payment.number}
-                  onChange={(e) => setPayment({ ...payment, number: formatCardNumber(e.target.value) })}
-                  className={payErrors.number ? 'err' : ''} />
-                {payErrors.number && <span className="co-err">{payErrors.number}</span>}
-              </div>
-
-              <div className="co-row">
-                <div className="co-field">
-                  <label htmlFor="co-expiry">Expiry Date</label>
-                  <input id="co-expiry" type="text" placeholder="MM/YY"
-                    inputMode="numeric" autoComplete="cc-exp"
-                    value={payment.expiry}
-                    onChange={(e) => setPayment({ ...payment, expiry: formatExpiry(e.target.value) })}
-                    className={payErrors.expiry ? 'err' : ''} />
-                  {payErrors.expiry && <span className="co-err">{payErrors.expiry}</span>}
-                </div>
-                <div className="co-field">
-                  <label htmlFor="co-cvv">
-                    CVV
-                    <button type="button" className="co-toggle-cvv"
-                      onClick={() => setShowCvv(!showCvv)}>
-                      {showCvv ? 'Hide' : 'Show'}
-                    </button>
-                  </label>
-                  <input id="co-cvv" type={showCvv ? 'text' : 'password'}
-                    placeholder="•••" inputMode="numeric" autoComplete="cc-csc" maxLength={3}
-                    value={payment.cvv}
-                    onChange={(e) => setPayment({ ...payment, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                    className={payErrors.cvv ? 'err' : ''} />
-                  {payErrors.cvv && <span className="co-err">{payErrors.cvv}</span>}
-                </div>
-              </div>
-
-              <div className="co-secure-note">
-                🔒 Your payment details are encrypted and secure
-              </div>
-
-              <div className="co-btn-row">
-                <button type="button" className="co-back" onClick={() => setStep('details')}>← Back</button>
-                <button type="submit" className="co-submit" disabled={processing} >
-                  {processing ? <span className="co-spinner" /> : `Pay ${formatCurrency(grandTotal)}`}
-                </button>
-              </div>
+              <p>{t('Payment is not collected online. Payment status will remain pending.', 'Plata nu se efectuează online. Statusul plății va rămâne în așteptare.')}</p>
+              {error && <p className="co-err" role="alert">{error}</p>}
+              <button type="submit" className="co-submit" disabled={processing || cart.length === 0}>
+                {processing ? t('Placing order…', 'Se plasează comanda…') : t('Place order', 'Plasează comanda')}
+              </button>
             </form>
           </div>
         )}
-
-        {/* ── Step 3: Confirmation ── */}
-        {step === 'confirm' && (
-          <div className="co-body co-confirm">
-            <div className="co-success-icon">✓</div>
-            <h2>Order Placed!</h2>
-            <p>Thank you, <strong>{details.name}</strong>. Your order is confirmed.</p>
-            <div className="co-order-ref">
-              <span>Order ID</span>
-              <span className="co-order-id">{orderId}</span>
-            </div>
-            <div className="co-confirm-summary">
-              {cart.map((item) => (
-                <div key={item.name} className="co-confirm-item">
-                  <span>{item.name} ×{item.qty}</span>
-                  <span>{formatCurrency(item.amount * item.qty)}</span>
-                </div>
-              ))}
-              <div className="co-confirm-total">
-                <span>Total Paid</span><span>{formatCurrency(grandTotal)}</span>
-              </div>
-            </div>
-            <p className="co-confirm-note">
-              A confirmation will be sent to <strong>{details.email}</strong>
-            </p>
-            {details.order_type === 'Home Delivery' && details.delivery_address && (
-              <p className="co-confirm-note">
-                Delivery location: <strong>{details.delivery_address}</strong>
-              </p>
-            )}
-            <button className="co-submit" onClick={() => { onSuccess(); onClose() }}>
-              Back to Menu
-            </button>
-          </div>
-        )}
-
       </div>
     </div>
   )

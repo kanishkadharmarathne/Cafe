@@ -247,10 +247,38 @@
 
 .co-order-item {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   font-family: 'Georgia', serif;
   font-size: 14px;
   color: #b89a74;
+}
+
+.co-order-item img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.co-order-item label {
+  display: flex;
+  flex: 1 0 100%;
+  flex-direction: column;
+  gap: 5px;
+  color: #c9a87c;
+  font: 11px 'Georgia', serif;
+}
+
+.co-order-item input {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(201,168,124,0.2);
+  border-radius: 6px;
+  color: #f0d8b0;
+  font: 14px 'Georgia', serif;
 }
 
 .co-order-item em {
@@ -289,6 +317,15 @@
   gap: 6px;
 }
 
+.co-form > label.co-field,
+.co-row > label.co-field {
+  font-family: 'Georgia', serif;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #c9a87c;
+}
+
 .co-field label {
   display: flex;
   justify-content: space-between;
@@ -301,7 +338,8 @@
 }
 
 .co-field input,
-.co-field textarea {
+.co-field textarea,
+.co-field select {
   width: 100%;
   min-width: 0;
   padding: 11px 14px;
@@ -320,10 +358,17 @@
 .co-field textarea::placeholder { color: #3a2a1a; }
 
 .co-field input:focus,
-.co-field textarea:focus { border-color: #c9a87c; }
+.co-field textarea:focus,
+.co-field select:focus { border-color: #c9a87c; }
+
+.co-field select option {
+  color: #f0d8b0;
+  background: #1a0a00;
+}
 
 .co-field input.err,
-.co-field textarea.err { border-color: #c0392b; }
+.co-field textarea.err,
+.co-field select.err { border-color: #c0392b; }
 
 .co-err {
   font-size: 11px;

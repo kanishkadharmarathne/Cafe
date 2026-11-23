@@ -30,10 +30,11 @@ src/
 | `/my-orders` | Signed-in customer's order history |
 | `/contact` | Contact form and Arad location reference |
 | `/our-legacy` | Restaurant philosophy (kept for existing links) |
-| `/admin` | Role-gated administration workspace |
+| `/admin` | Role-gated administration workspace, including the kitchen queue |
+| `/admin/kitchen` | Redirects to the kitchen tab in the administration workspace |
 | Any other path | Branded not-found page |
 
-The public shell shares the navbar and footer. Admin workspace sections are selected inside the admin page and remain protected by the existing Supabase profile-role checks.
+The public shell shares the navbar and footer. Admin workspace sections are selected inside the admin page. The workspace checks the authenticated user's `profiles.role`; kitchen users can access only the kitchen tab, while admins and super-admins retain their existing sections. Database RLS and RPC permissions must also enforce access.
 
 ## Integrations and configuration
 
@@ -51,6 +52,18 @@ The public menu reads active categories and products from Supabase in display or
 
 The existing admin menu supports editing both languages, ordering, visibility and product availability. Category and product images can be uploaded to the existing `taste_of_ceylon_menu_images` bucket. Uploads and database edits require the corresponding Supabase permissions; no service-role key is used by the frontend.
 
+## Orders and kitchen
+
+Customer and admin order creation send the selected `low`, `medium`, or `high` spice level to `create_order_secure`; displayed subtotals are estimates and are not submitted. Kitchen staff see permitted orders, can refresh the queue, and use `update_order_status_secure` for status transitions, including cancellation of active orders after confirmation. The queue also refreshes every 30 seconds. Neither workflow updates payment status.
+
+Admins can create orders and browse the searchable, filterable order table in the same Orders section. Viewing an order reveals its items and history, and switching between the table and creation form retains an unfinished order while the section remains open. The table refreshes after a successful creation.
+
+Dine-in addition details show items and status changes from `order_addition_status_history`, supplemented by available draft, submission, completion, and cancellation timestamps when an audit entry is missing. The backend must record status transitions in that table and permit admin reads through RLS; older intermediate transitions cannot be reconstructed if they were not recorded.
+
+Admins can add items to dine-in orders even when the original order is completed; cancelled orders cannot receive additions. The secure addition RPCs must enforce the same rule.
+
+The backend must store and return `orders.spice_level`, accept it in `create_order_secure`, grant the appropriate kitchen role access to the order and item reads, and enforce role and transition checks in `update_order_status_secure`. These database contracts and policies are not defined in this repository and must be verified against the deployed environment. Dine-in editing is disabled until an admin-only transactional edit RPC can validate the existing order and its items and recalculate totals without changing payment status or order history.
+
 ## Development
 
 - `npm run dev` — start the Vite development server
@@ -58,4 +71,4 @@ The existing admin menu supports editing both languages, ordering, visibility an
 - `npm run lint` — run ESLint
 - `npm run preview` — preview the production build
 
-There is no standalone test script in the current project.
+On Node.js 24, run the isolated order tests with `node --test tests/adminAccess.test.ts tests/orderFilters.test.ts tests/kitchenWorkflow.test.ts tests/orders.test.mjs`. The RPC tests use a mock and block network requests; they do not verify deployed Supabase permissions or database behavior.

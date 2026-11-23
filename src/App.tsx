@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Outlet, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, Link, Navigate } from 'react-router-dom'
 import Navbar from './component/Navbar'
 import Footer from './component/Footer'
 import Home from './app/Home'
@@ -38,6 +38,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin/kitchen" element={<Navigate to="/admin?tab=kitchen" replace />} />
         <Route element={<SiteLayout />}>
           <Route index element={<Home />} />
           <Route path="our-cafe" element={<OurCafe />} />

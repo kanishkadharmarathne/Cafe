@@ -1,0 +1,13 @@
+.spice-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.spice-low { color: #468058; background: #e8f5e8; }
+.spice-medium { color: #895600; background: #fff2ce; }
+.spice-high { color: #a42220; background: #ffe4e0; }
+.spice-unknown { color: #4a4a4a; background: #eeeeee; }

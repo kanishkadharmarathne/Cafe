@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
+import { createSecureOrder, getCreatedOrderReference, type OrderType, type SpiceLevel } from '../../lib/orders'
+import { SpiceSelector } from '../../component/SpiceLevel'
+import { localized, useLanguage } from '../../lib/language'
 import '../Menu.css'
+import '../../component/CheckoutModal.css'
 
 interface MenuItem {
   id: string
@@ -27,7 +31,9 @@ interface Category {
   category_name_ro: string | null
 }
 
-export default function DiOrders() {
+export default function DiOrders({ onOrderCreated }: { onOrderCreated: () => void }) {
+  const { language } = useLanguage()
+  const t = useCallback((en: string, ro: string) => language === 'ro' ? ro : en, [language])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [menuLoading, setMenuLoading] = useState(true)
@@ -35,6 +41,10 @@ export default function DiOrders() {
   const [added, setAdded] = useState<Record<string, boolean>>({})
   const [savingOrder, setSavingOrder] = useState(false)
   const [message, setMessage] = useState('')
+  const [orderType, setOrderType] = useState<OrderType>('Dine In')
+  const [spiceLevel, setSpiceLevel] = useState<SpiceLevel>('medium')
+  const [customer, setCustomer] = useState({ name: '', phone: '', email: '', tableNumber: '', pickupMode: 'asap' as 'asap' | 'scheduled', pickupTime: '', address: '', latitude: '', longitude: '', deliveryInstructions: '', notes: '' })
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     async function fetchMenu() {
@@ -66,25 +76,25 @@ export default function DiOrders() {
         setCategories(categoriesData as Category[])
       } else if (categoriesError) {
         console.error('Failed to fetch categories:', categoriesError)
-        setMessage('Unable to load menu categories right now.')
+        setMessage(t('Unable to load menu categories right now.', 'Nu am putut încărca categoriile meniului.'))
       }
 
       if (!menuError && menuData) {
         setMenuItems(menuData as MenuItem[])
       } else if (menuError) {
         console.error('Failed to fetch menu items:', menuError)
-        setMessage('Unable to load menu items right now.')
+        setMessage(t('Unable to load menu items right now.', 'Nu am putut încărca produsele din meniu.'))
       }
 
       setMenuLoading(false)
     }
 
     void fetchMenu()
-  }, [])
+  }, [t])
 
   const groupedMenu = useMemo(
     () => {
-      const categoryNameById = new Map(categories.map((category) => [category.id, category.category_name_en || category.category_name_ro || 'Uncategorized']))
+      const categoryNameById = new Map(categories.map((category) => [category.id, localized(language, category.category_name_en, category.category_name_ro) || t('Uncategorized', 'Fără categorie')]))
 
       return Array.from(
         menuItems.filter(item => !item.category_id || categoryNameById.has(item.category_id))
@@ -92,7 +102,7 @@ export default function DiOrders() {
             const categoryKey = item.category_id || 'uncategorized'
             const categoryName = item.category_id
               ? categoryNameById.get(item.category_id) || 'Uncategorized'
-              : 'Uncategorized'
+              : t('Uncategorized', 'Fără categorie')
 
             if (!groups.has(categoryKey)) {
               groups.set(categoryKey, {
@@ -108,11 +118,14 @@ export default function DiOrders() {
           .values()
       )
     },
-    [menuItems, categories]
+    [menuItems, categories, language, t]
   )
 
   const totalItems = cart.reduce((sum, item) => sum + item.qty, 0)
   const grandTotal = cart.reduce((sum, item) => sum + item.amount * item.qty, 0)
+  const filteredMenuItems = menuItems.filter(item =>
+    `${item.item_name_en || ''} ${item.item_name_ro || ''}`.toLowerCase().includes(search.trim().toLowerCase())
+  )
 
   function handleAddToCart(menuItem: MenuItem) {
     setMessage('')
@@ -128,7 +141,7 @@ export default function DiOrders() {
         ...prev,
         {
           id: menuItem.id,
-          name: menuItem.item_name_en || menuItem.item_name_ro || 'Unnamed item',
+          name: localized(language, menuItem.item_name_en, menuItem.item_name_ro) || t('Unnamed item', 'Produs fără nume'),
           qty: 1,
           amount: menuItem.price,
         },
@@ -155,7 +168,7 @@ export default function DiOrders() {
     setCart((prev) => prev.filter((item) => item.id !== id))
   }
 
-  async function handleCreateDineInOrder() {
+  async function handleCreateOrder() {
     if (cart.length === 0 || savingOrder) {
       return
     }
@@ -166,94 +179,81 @@ export default function DiOrders() {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser()
+      if (authError) throw authError
 
-      const customerName =
+      const customerName = customer.name.trim() ||
         user?.user_metadata?.full_name ||
         user?.user_metadata?.name ||
         user?.email ||
-        'Dine In Customer'
+        ''
+      if (!customerName || !customer.phone.trim()) {
+        throw new Error('Customer name and phone are required.')
+      }
+      if (orderType === 'Delivery' && !customer.address.trim()) {
+        throw new Error('A delivery address is required.')
+      }
+      if (orderType === 'Pickup' && customer.pickupMode === 'scheduled' &&
+        (!customer.pickupTime || !Number.isFinite(new Date(customer.pickupTime).getTime()) || new Date(customer.pickupTime).getTime() <= Date.now())) {
+        throw new Error('Scheduled pickup must be set to a future time.')
+      }
+      const hasLatitude = customer.latitude.trim() !== ''
+      const hasLongitude = customer.longitude.trim() !== ''
+      if (orderType === 'Delivery' && hasLatitude !== hasLongitude) {
+        throw new Error('Enter both delivery coordinates or leave both blank.')
+      }
+      const latitude = hasLatitude ? Number(customer.latitude) : undefined
+      const longitude = hasLongitude ? Number(customer.longitude) : undefined
+      if ((latitude !== undefined && !Number.isFinite(latitude)) || (longitude !== undefined && !Number.isFinite(longitude))) {
+        throw new Error('Delivery coordinates must be valid numbers.')
+      }
 
-      const orderPayload = {
-        user_id: user?.id ?? null,
+      const result = await createSecureOrder({
+        order_type: orderType,
+        spice_level: spiceLevel,
         customer_name: customerName,
-        email: user?.email ?? 'dinein@local',
-        phone: user?.phone ?? '0000000000',
-        order_type: 'Dine In',
-        delivery_address: 'restrurant',
-        delivery_latitude: null,
-        delivery_longitude: null,
-        total_value: grandTotal,
-        payment_status: false,
-      }
-
-      let orderResponse = await supabase
-        .from('orders')
-        .insert(orderPayload)
-        .select('order_id')
-        .single()
-
-      // Support schemas that do not have delivery_latitude/delivery_longitude columns.
-      if (
-        orderResponse.error &&
-        /delivery_latitude|delivery_longitude|column/i.test(orderResponse.error.message)
-      ) {
-        const { delivery_latitude: _deliveryLatitude, delivery_longitude: _deliveryLongitude, ...payloadWithoutCoords } = orderPayload
-        orderResponse = await supabase
-          .from('orders')
-          .insert(payloadWithoutCoords)
-          .select('order_id')
-          .single()
-      }
-
-      // Some constraints may validate exact spelling/casing for dine-in location.
-      if (
-        orderResponse.error &&
-        orderResponse.error.code === '23514' &&
-        /delivery_location_check/i.test(orderResponse.error.message)
-      ) {
-        const { delivery_latitude: _deliveryLatitude, delivery_longitude: _deliveryLongitude, ...payloadWithoutCoords } = orderPayload
-        orderResponse = await supabase
-          .from('orders')
-          .insert({ ...payloadWithoutCoords, delivery_address: 'restaurant' })
-          .select('order_id')
-          .single()
-      }
-
-      const { data: order, error: orderError } = orderResponse
-
-      if (orderError || !order) {
-        if (
-          orderError?.code === '23514' &&
-          /delivery_location_check/i.test(orderError.message)
-        ) {
-          throw new Error('orders.delivery_location_check rejected this Dine In payload. Please update the DB constraint to allow order_type = Dine In with delivery_address = restrurant (or restaurant).')
-        }
-
-        throw orderError || new Error('Failed to create order')
-      }
-
-      const orderItemsPayload = cart.map((item) => ({
-        order_id: order.order_id,
-        item_id: item.id,
-        item_name: item.name,
-        quantity: item.qty,
-      }))
-
-      const { error: orderItemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsPayload)
-
-      if (orderItemsError) {
-        await supabase.from('orders').delete().eq('order_id', order.order_id)
-        throw orderItemsError
-      }
+        phone: customer.phone.trim(),
+        email: customer.email.trim() || user?.email || null,
+        items: cart.map(item => ({ item_id: item.id, quantity: item.qty, selected_options: [] })),
+        ...(customer.notes.trim() ? { notes: customer.notes.trim() } : {}),
+        ...(orderType === 'Dine In' && customer.tableNumber.trim() ? { table_number: customer.tableNumber.trim() } : {}),
+        ...(orderType === 'Pickup' ? {
+          pickup_mode: customer.pickupMode,
+          pickup_time: customer.pickupMode === 'scheduled' ? new Date(customer.pickupTime).toISOString() : null,
+        } : {}),
+        ...(orderType === 'Delivery' ? {
+          delivery_address: customer.address.trim(),
+          delivery_instructions: customer.deliveryInstructions.trim(),
+          ...(latitude !== undefined && longitude !== undefined ? {
+            delivery_latitude: latitude,
+            delivery_longitude: longitude,
+          } : {}),
+        } : {}),
+      })
 
       setCart([])
-      setMessage(`Dine in order #${order.order_id} created successfully.`)
+      onOrderCreated()
+      setMessage(t(
+        `Order ${getCreatedOrderReference(result) ? `#${getCreatedOrderReference(result)} ` : ''}created successfully.`,
+        `Comanda ${getCreatedOrderReference(result) ? `#${getCreatedOrderReference(result)} ` : ''}a fost creată cu succes.`
+      ))
     } catch (error) {
-      console.error('Failed to create dine in order:', error)
-      setMessage('Failed to create dine in order. Please try again.')
+      console.error('Failed to create admin order:', error)
+      const reason = error instanceof Error ? error.message.toLowerCase() : ''
+      setMessage(
+        reason.includes('name and phone')
+          ? t('Customer name and phone are required.', 'Numele și numărul de telefon al clientului sunt obligatorii.')
+          : reason.includes('delivery address')
+            ? t('A delivery address is required.', 'Adresa de livrare este obligatorie.')
+            : reason.includes('scheduled pickup')
+              ? t('Choose a valid future pickup time.', 'Alege o oră de ridicare validă, în viitor.')
+              : reason.includes('coordinates')
+                ? t('Enter valid latitude and longitude together.', 'Introdu împreună latitudinea și longitudinea valide.')
+                : reason.includes('auth') || reason.includes('permission')
+                  ? t('Your admin session is not authorized. Sign in again and retry.', 'Sesiunea de administrator nu este autorizată. Autentifică-te din nou și încearcă iar.')
+                : t('Failed to create order. Review the details and try again.', 'Comanda nu a putut fi creată. Verifică datele și încearcă din nou.')
+      )
     } finally {
       setSavingOrder(false)
     }
@@ -262,21 +262,58 @@ export default function DiOrders() {
   return (
     <div className="messages-page">
       <div className="admin-section-header">
-        <h2 className="admin-section-title">Dine In Orders</h2>
+        <h2 className="admin-section-title">{t('Create Order', 'Creează comandă')}</h2>
+      </div>
+
+      <div className="co-form">
+        <SpiceSelector value={spiceLevel} onChange={setSpiceLevel} />
+        <label className="co-field">{t('Order type', 'Tipul comenzii')}
+          <select value={orderType} onChange={event => setOrderType(event.target.value as OrderType)}>
+            <option value="Dine In">{t('Dine In', 'La restaurant')}</option>
+            <option value="Takeaway">{t('Takeaway', 'La pachet')}</option>
+            <option value="Pickup">{t('Pickup', 'Ridicare')}</option>
+            <option value="Delivery">{t('Delivery', 'Livrare')}</option>
+          </select>
+        </label>
+        <div className="co-row">
+          <label className="co-field">{t('Customer name', 'Numele clientului')}<input value={customer.name} onChange={event => setCustomer({ ...customer, name: event.target.value })} /></label>
+          <label className="co-field">{t('Phone number', 'Număr de telefon')}<input type="tel" value={customer.phone} onChange={event => setCustomer({ ...customer, phone: event.target.value })} /></label>
+          <label className="co-field">{t('Email (optional)', 'E-mail (opțional)')}<input type="email" value={customer.email} onChange={event => setCustomer({ ...customer, email: event.target.value })} /></label>
+        </div>
+        {orderType === 'Dine In' && <label className="co-field">{t('Table number (optional)', 'Numărul mesei (opțional)')}<input value={customer.tableNumber} onChange={event => setCustomer({ ...customer, tableNumber: event.target.value })} /></label>}
+        {orderType === 'Pickup' && <>
+          <label className="co-field">{t('Pickup time', 'Ora ridicării')}
+            <select value={customer.pickupMode} onChange={event => setCustomer({ ...customer, pickupMode: event.target.value as 'asap' | 'scheduled' })}>
+              <option value="asap">{t('As soon as possible', 'Cât mai curând')}</option>
+              <option value="scheduled">{t('Scheduled', 'Programată')}</option>
+            </select>
+          </label>
+          {customer.pickupMode === 'scheduled' && <label className="co-field">{t('Scheduled date and time', 'Data și ora programată')}<input type="datetime-local" value={customer.pickupTime} onChange={event => setCustomer({ ...customer, pickupTime: event.target.value })} /></label>}
+        </>}
+        {orderType === 'Delivery' && <>
+          <label className="co-field">{t('Delivery address', 'Adresa de livrare')}<textarea value={customer.address} onChange={event => setCustomer({ ...customer, address: event.target.value })} /></label>
+          <div className="co-row">
+            <label className="co-field">{t('Latitude (optional)', 'Latitudine (opțională)')}<input type="number" step="any" value={customer.latitude} onChange={event => setCustomer({ ...customer, latitude: event.target.value })} /></label>
+            <label className="co-field">{t('Longitude (optional)', 'Longitudine (opțională)')}<input type="number" step="any" value={customer.longitude} onChange={event => setCustomer({ ...customer, longitude: event.target.value })} /></label>
+          </div>
+          <label className="co-field">{t('Delivery instructions (optional)', 'Instrucțiuni de livrare (opțional)')}<textarea value={customer.deliveryInstructions} onChange={event => setCustomer({ ...customer, deliveryInstructions: event.target.value })} /></label>
+        </>}
+        <label className="co-field">{t('Order notes (optional)', 'Note pentru comandă (opțional)')}<textarea value={customer.notes} onChange={event => setCustomer({ ...customer, notes: event.target.value })} /></label>
+        <label className="co-field">{t('Search menu', 'Caută în meniu')}<input type="search" value={search} onChange={event => setSearch(event.target.value)} /></label>
       </div>
 
       {cart.length > 0 && (
         <div className="cart-panel">
           <div className="cart-panel-header">
             <span className="cart-panel-title">
-              Dine In Cart
+              {t('Order cart', 'Coșul comenzii')}
               <span className="cart-total-badge">
-                {totalItems} item{totalItems > 1 ? 's' : ''}
+                {totalItems} {totalItems === 1 ? t('item', 'produs') : t('items', 'produse')}
               </span>
             </span>
 
             <button className="cart-clear-btn" onClick={() => setCart([])}>
-              Clear all
+              {t('Clear all', 'Golește coșul')}
             </button>
           </div>
 
@@ -285,22 +322,22 @@ export default function DiOrders() {
               <li className="cart-list-item" key={item.id}>
                 <div className="cart-item-name">
                   <span>{item.name}</span>
-                  <span className="cart-item-unit-price">{formatCurrency(item.amount)} each</span>
+                  <span className="cart-item-unit-price">{formatCurrency(item.amount)} {t('each', 'bucata')}</span>
                 </div>
 
                 <div className="cart-item-controls">
-                  <button className="cart-qty-btn" onClick={() => decrement(item.id)}>
+                  <button className="cart-qty-btn" aria-label={`${t('Decrease quantity', 'Scade cantitatea')}: ${item.name}`} onClick={() => decrement(item.id)}>
                     -
                   </button>
                   <span className="cart-qty">{item.qty}</span>
-                  <button className="cart-qty-btn" onClick={() => increment(item.id)}>
+                  <button className="cart-qty-btn" aria-label={`${t('Increase quantity', 'Crește cantitatea')}: ${item.name}`} onClick={() => increment(item.id)}>
                     +
                   </button>
                 </div>
 
                 <span className="cart-item-subtotal">{formatCurrency(item.amount * item.qty)}</span>
 
-                <button className="cart-remove-btn" onClick={() => removeItem(item.id)}>
+                <button className="cart-remove-btn" aria-label={`${t('Remove', 'Elimină')}: ${item.name}`} onClick={() => removeItem(item.id)}>
                   x
                 </button>
               </li>
@@ -309,17 +346,17 @@ export default function DiOrders() {
 
           <div className="cart-panel-footer">
             <div className="cart-grand-total">
-              <span>Total</span>
+            <span>{t('Subtotal estimate', 'Subtotal estimativ')}</span>
               <span className="cart-total-amount">{formatCurrency(grandTotal)}</span>
             </div>
 
             <div className="checkout-action">
               <button
                 className="btn-checkout-full"
-                onClick={handleCreateDineInOrder}
+                onClick={handleCreateOrder}
                 disabled={savingOrder || cart.length === 0}
               >
-                {savingOrder ? 'Saving...' : 'Create Dine In Order'}
+                {savingOrder ? t('Saving…', 'Se salvează…') : t('Create Order', 'Creează comandă')}
               </button>
             </div>
           </div>
@@ -330,24 +367,24 @@ export default function DiOrders() {
 
       {menuLoading ? (
         <p style={{ textAlign: 'center', color: '#7a5c3e', padding: '60px 0' }}>
-          Loading menu...
+          {t('Loading menu…', 'Se încarcă meniul…')}
         </p>
       ) : groupedMenu.length === 0 ? (
-        <div className="empty">No active menu items available.</div>
+        <div className="empty">{t('No active menu items available.', 'Nu există produse active în meniu.')}</div>
       ) : (
         groupedMenu.map((group) => (
           <section className="menu-section" key={group.key}>
             <h2 className="menu-category">
-              {group.name}
+                {group.name}
             </h2>
 
             <div className="menu-grid">
-              {group.items.map((menuItem) => (
+              {group.items.filter(item => filteredMenuItems.some(filtered => filtered.id === item.id)).map((menuItem) => (
                 <div className="menu-item" key={menuItem.id}>
                   <div className="menu-item-info">
-                    <h3>{menuItem.item_name_en || menuItem.item_name_ro}</h3>
+                    <h3>{localized(language, menuItem.item_name_en, menuItem.item_name_ro)}</h3>
                     {menuItem.portion && <span className="menu-item-portion">{menuItem.portion}</span>}
-                    <p>{menuItem.description_en || menuItem.description_ro}</p>
+                    <p>{localized(language, menuItem.description_en, menuItem.description_ro)}</p>
                   </div>
 
                   <div className="menu-item-right">
@@ -357,7 +394,7 @@ export default function DiOrders() {
                         className={`menu-btn-cart ${added[menuItem.id] ? 'added' : ''}`}
                         onClick={() => handleAddToCart(menuItem)}
                       >
-                        {added[menuItem.id] ? 'Added' : '+ Cart'}
+                        {added[menuItem.id] ? t('Added', 'Adăugat') : t('+ Cart', '+ Coș')}
                       </button>
                     </div>
                   </div>

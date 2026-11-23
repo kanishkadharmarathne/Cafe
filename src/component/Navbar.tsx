@@ -5,6 +5,8 @@ import AuthModal from './AuthModal'
 import { supabase } from '../lib/supabase'
 import { AiOutlineMenuUnfold } from "react-icons/ai";
 import { useLanguage } from '../lib/language'
+import type { Session } from '@supabase/supabase-js'
+import { canAccessKitchen as isKitchenRole } from '../lib/kitchenWorkflow'
 
 export default function Navbar() {
   const { language, setLanguage, t } = useLanguage()
@@ -12,28 +14,35 @@ export default function Navbar() {
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
+  const [canAccessKitchen, setCanAccessKitchen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
+    let generation = 0
+    let timer: number | undefined
 
-    const syncUserSession = async (session: any) => {
+    const syncUserSession = async (session: Session | null) => {
+      const current = ++generation
       if (session?.user) {
         const displayName = session.user.user_metadata?.name || session.user.email || 'User'
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
           .maybeSingle()
 
-        if (!isMounted) return
+        if (!isMounted || current !== generation) return
+        if (error) console.error('Failed to retrieve user role:', error)
 
         setUserName(displayName)
         setCanAccessAdmin(profile?.role === 'admin' || profile?.role === 'super_admin')
+        setCanAccessKitchen(isKitchenRole(profile?.role))
       } else {
         if (!isMounted) return
         setUserName(null)
         setCanAccessAdmin(false)
+        setCanAccessKitchen(false)
       }
     }
 
@@ -42,11 +51,17 @@ export default function Navbar() {
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      void syncUserSession(session)
+      generation++
+      setCanAccessAdmin(false)
+      setCanAccessKitchen(false)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => { void syncUserSession(session) }, 0)
     })
 
     return () => {
       isMounted = false
+      generation++
+      window.clearTimeout(timer)
       subscription.unsubscribe()
     }
   }, [])
@@ -55,6 +70,7 @@ export default function Navbar() {
     await supabase.auth.signOut()
     setUserName(null)
     setCanAccessAdmin(false)
+    setCanAccessKitchen(false)
   }
 
   return (
@@ -107,8 +123,8 @@ export default function Navbar() {
           {userName ? (
             <>
               <span className="nav-user-name">{userName}</span>
-              {canAccessAdmin && (
-                <button className="nav-btn-admin" onClick={() => navigate('/admin')}>Admin</button>
+              {(canAccessAdmin || canAccessKitchen) && (
+                <button className="nav-btn-admin" onClick={() => navigate('/admin')}>{canAccessAdmin ? 'Admin' : t('Kitchen', 'Bucătărie')}</button>
               )}
               <button className="nav-btn-signout" onClick={handleSignOut}>Sign Out</button>
             </>

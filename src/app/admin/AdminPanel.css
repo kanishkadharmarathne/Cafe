@@ -63,6 +63,7 @@
   align-items: center;
   justify-content: center;
   background: #0e0500;
+  color: #e8d5b7;
 }
 
 .admin-gate-spinner {
@@ -171,6 +172,24 @@
 .admin-back-btn:hover {
   color: #c9a87c;
   border-color: #c9a87c;
+}
+
+.admin-language {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 12px;
+  color: #c9a87c;
+  font-size: 13px;
+}
+
+.admin-language select {
+  background: #1a0a00;
+  color: #f0d8b0;
+  border: 1px solid rgba(201, 168, 124, 0.25);
+  border-radius: 6px;
+  padding: 6px;
 }
 
 /* ── Main ── */
@@ -352,6 +371,152 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 620px;
+}
+
+.admin-orders-table {
+  min-width: 1100px;
+}
+
+.admin-table.admin-orders-table {
+  overflow: visible;
+}
+
+.admin-orders-table-wrapper {
+  container-type: inline-size;
+}
+
+.admin-order-type {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ededed;
+  color: #424242;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.admin-order-type[data-order-type="Dine In"] { background: #e2f2e7; color: #175c35; }
+.admin-order-type[data-order-type="Takeaway"] { background: #fff0d4; color: #805000; }
+.admin-order-type[data-order-type="Pickup"] { background: #e3efff; color: #174e88; }
+.admin-order-type[data-order-type="Delivery"] { background: #f0e6fa; color: #663786; }
+
+.admin-order-filters {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.admin-order-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 14px;
+}
+
+.admin-order-filters .admin-form-group {
+  min-width: 0;
+}
+
+.admin-order-filters input,
+.admin-order-filters select {
+  min-width: 0;
+  min-height: 44px;
+}
+
+.admin-order-filters select option {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.admin-order-filters input:focus-visible,
+.admin-order-filters select:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.admin-order-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-order-actions .admin-btn-secondary {
+  white-space: nowrap;
+}
+
+.admin-order-actions .admin-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-order-details {
+  position: sticky;
+  left: 14px;
+  max-width: min(620px, calc(100cqw - 30px));
+  overflow-wrap: anywhere;
+}
+
+.admin-status-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 580px;
+}
+
+.admin-status-event {
+  position: relative;
+  padding: 0 0 22px 30px;
+}
+
+.admin-status-event::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--color-primary);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.admin-status-event::after {
+  content: '';
+  position: absolute;
+  top: 19px;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.admin-status-event:last-child {
+  padding-bottom: 0;
+}
+
+.admin-status-event:last-child::after {
+  display: none;
+}
+
+.admin-status-event.is-cancelled::before {
+  border-color: #b84235;
+}
+
+.admin-status-event-title {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.admin-status-event-time,
+.admin-status-event-detail,
+.admin-status-history-empty {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .admin-table th,
@@ -541,6 +706,7 @@
 
 .admin-top-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 18px;
 }

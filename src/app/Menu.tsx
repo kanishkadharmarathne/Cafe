@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './Pages.css'
 import './Menu.css'
 import CheckoutModal from '../component/CheckoutModal'
+import AuthModal from '../component/AuthModal'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/currency'
 import { localized, useLanguage } from '../lib/language'
@@ -31,11 +32,30 @@ export default function Menu() {
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
   const [selected, setSelected] = useState<MenuItem | null>(null)
-  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [quantities, setQuantities] = useState<Record<string, number>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('taste-of-ceylon-cart') || '{}') as Record<string, unknown>
+      return Object.entries(saved).reduce<Record<string, number>>((cart, [id, quantity]) => {
+        if (typeof quantity === 'number' && Number.isSafeInteger(quantity) && quantity > 0) {
+          cart[id] = quantity
+        }
+        return cart
+      }, {})
+    } catch (error) {
+      console.error('Failed to restore saved cart:', error)
+      return {}
+    }
+  })
   const [showCheckout, setShowCheckout] = useState(false)
   const [checkoutError, setCheckoutError] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null)
+  const [continueToCheckout, setContinueToCheckout] = useState(false)
   const [reload, setReload] = useState(0)
   const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    localStorage.setItem('taste-of-ceylon-cart', JSON.stringify(quantities))
+  }, [quantities])
 
   useEffect(() => {
     let active = true
@@ -86,16 +106,19 @@ export default function Menu() {
     const text = `${nameOf(item)} ${localized(language, item.description_en, item.description_ro)} ${localized(language, item.ingredients_en, item.ingredients_ro)}`.toLocaleLowerCase()
     return (categoryId === 'all' || item.category_id === categoryId) && text.includes(search.trim().toLocaleLowerCase())
   })
-  const cart = visibleItems.filter(item => quantities[item.id] > 0).map(item => ({
-    id: item.id, name: nameOf(item), qty: quantities[item.id], amount: Number(item.price),
+  const cart = items.filter(item => quantities[item.id] > 0).map(item => ({
+    id: item.id, name: nameOf(item), qty: quantities[item.id], amount: Number(item.price), image_url: item.image_url,
   }))
   const totalItems = cart.reduce((sum, item) => sum + item.qty, 0)
   const grandTotal = cart.reduce((sum, item) => sum + item.qty * item.amount, 0)
+  const hasUnavailableCartItems = cart.some(entry => !items.find(item => item.id === entry.id)?.is_available)
 
   function changeQuantity(item: MenuItem, change: number) {
     if (change > 0 && !item.is_available) return
     setQuantities(previous => {
-      const quantity = Math.max(0, (previous[item.id] || 0) + change)
+      const current = previous[item.id] || 0
+      if (change > 0 && current >= Number.MAX_SAFE_INTEGER) return previous
+      const quantity = Math.max(0, current + change)
       return { ...previous, [item.id]: quantity }
     })
   }
@@ -105,6 +128,8 @@ export default function Menu() {
     if (error || !user) {
       if (error) console.error('Failed to check sign-in:', error)
       setCheckoutError(true)
+      setContinueToCheckout(true)
+      setAuthMode('login')
       return
     }
     setCheckoutError(false)
@@ -153,13 +178,15 @@ export default function Menu() {
             </div>
             <ul className="cart-list">
               {cart.map(entry => {
-                const item = visibleItems.find(product => product.id === entry.id)!
+                const item = items.find(product => product.id === entry.id)!
                 return <li className="cart-list-item" key={entry.id}>
+                  {entry.image_url && <img src={entry.image_url} alt="" width="48" height="48" />}
                   <div className="cart-item-name"><span>{entry.name}</span><span className="cart-item-unit-price">{formatCurrency(entry.amount)} / {t('item', 'bucată')}</span></div>
+                  {!item?.is_available && <span className="checkout-message" role="alert">{t('This item is currently unavailable. Remove it before checkout.', 'Acest produs nu este disponibil momentan. Elimină-l înainte de a continua.')}</span>}
                   <div className="cart-item-controls">
-                    <button className="cart-qty-btn" aria-label={`${t('Decrease quantity', 'Scade cantitatea')}: ${entry.name}`} onClick={() => changeQuantity(item, -1)}>−</button>
+                    <button className="cart-qty-btn" aria-label={`${t('Decrease quantity', 'Scade cantitatea')}: ${entry.name}`} onClick={() => setQuantities(previous => ({ ...previous, [entry.id]: Math.max(0, entry.qty - 1) }))}>−</button>
                     <span className="cart-qty">{entry.qty}</span>
-                    <button className="cart-qty-btn" aria-label={`${t('Increase quantity', 'Crește cantitatea')}: ${entry.name}`} disabled={!item.is_available} onClick={() => changeQuantity(item, 1)}>+</button>
+                    <button className="cart-qty-btn" aria-label={`${t('Increase quantity', 'Crește cantitatea')}: ${entry.name}`} disabled={!item?.is_available} onClick={() => item && changeQuantity(item, 1)}>+</button>
                   </div>
                   <span className="cart-item-subtotal">{formatCurrency(entry.amount * entry.qty)}</span>
                   <button className="cart-remove-btn" aria-label={`${t('Remove', 'Elimină')}: ${entry.name}`} onClick={() => setQuantities(previous => ({ ...previous, [entry.id]: 0 }))}>✕</button>
@@ -167,9 +194,9 @@ export default function Menu() {
               })}
             </ul>
             <div className="cart-panel-footer">
-              <div className="cart-grand-total"><span>Total</span><span className="cart-total-amount">{formatCurrency(grandTotal)}</span></div>
+              <div className="cart-grand-total"><span>{t('Subtotal estimate', 'Subtotal estimativ')}</span><span className="cart-total-amount">{formatCurrency(grandTotal)}</span></div>
               <div className="checkout-action">
-                <button className="btn-checkout-full" onClick={handleCheckout}>{t('Proceed to checkout', 'Finalizează comanda')} →</button>
+                <button className="btn-checkout-full" disabled={hasUnavailableCartItems} onClick={handleCheckout}>{t('Proceed to checkout', 'Finalizează comanda')} →</button>
                 {checkoutError && <p className="checkout-message" role="alert">{t('Please sign in before placing an order.', 'Autentifică-te înainte de a plasa o comandă.')}</p>}
               </div>
             </div>
@@ -220,6 +247,16 @@ export default function Menu() {
         </div>
       </div>}
       {showCheckout && <CheckoutModal cart={cart} grandTotal={grandTotal} onClose={() => setShowCheckout(false)} onSuccess={() => setQuantities({})} />}
+      {authMode && <AuthModal
+        initialMode={authMode}
+        onClose={() => { setAuthMode(null); setContinueToCheckout(false) }}
+        onSuccess={() => {
+          setAuthMode(null)
+          setCheckoutError(false)
+          if (continueToCheckout) setShowCheckout(true)
+          setContinueToCheckout(false)
+        }}
+      />}
     </>
   )
 }
